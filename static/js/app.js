@@ -94,10 +94,56 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('show');
 }
 
+function toggleSidebarCollapse() {
+    const sidebar = document.getElementById('sidebar');
+    const collapseBtn = document.getElementById('sidebarCollapseBtn');
+    if (!sidebar) return;
+    const collapsed = sidebar.classList.toggle('collapsed');
+    localStorage.setItem('asb-sidebar-collapsed', collapsed ? 'true' : 'false');
+    
+    if (collapsed) {
+        document.documentElement.classList.add('sidebar-collapsed-pref');
+    } else {
+        document.documentElement.classList.remove('sidebar-collapsed-pref');
+    }
+
+    if (collapseBtn) {
+        if (collapsed) {
+            collapseBtn.innerHTML = '<i class="bi bi-dedent"></i>';
+            collapseBtn.title = 'Expand Sidebar';
+        } else {
+            collapseBtn.innerHTML = '<i class="bi bi-indent"></i>';
+            collapseBtn.title = 'Collapse Sidebar';
+        }
+    }
+}
+
 // ── DOMContentLoaded ──
 document.addEventListener('DOMContentLoaded', () => {
     // Sync theme button icon on every page load
     _updateThemeBtn(document.documentElement.getAttribute('data-theme') || 'dark');
+
+    // Restore sidebar collapse state
+    const sidebar = document.getElementById('sidebar');
+    const collapseBtn = document.getElementById('sidebarCollapseBtn');
+    const isCollapsed = localStorage.getItem('asb-sidebar-collapsed') === 'true';
+    if (sidebar) {
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            document.documentElement.classList.add('sidebar-collapsed-pref');
+            if (collapseBtn) {
+                collapseBtn.innerHTML = '<i class="bi bi-dedent"></i>';
+                collapseBtn.title = 'Expand Sidebar';
+            }
+        } else {
+            sidebar.classList.remove('collapsed');
+            document.documentElement.classList.remove('sidebar-collapsed-pref');
+            if (collapseBtn) {
+                collapseBtn.innerHTML = '<i class="bi bi-indent"></i>';
+                collapseBtn.title = 'Collapse Sidebar';
+            }
+        }
+    }
 
     // Delete modal confirm
     const deleteBtn = document.getElementById('deleteConfirmBtn');
@@ -111,4 +157,38 @@ document.addEventListener('DOMContentLoaded', () => {
             _deleteCallback = null;
         });
     }
+
+    // Restore collapsible sidebar tree states on load
+    document.querySelectorAll('.tree-workspace-content, .tree-project-content').forEach(el => {
+        const id = el.id.replace('content-', '');
+        const state = localStorage.getItem('sidebar-' + id);
+        const chevron = document.getElementById('chevron-' + id);
+        if (state === 'collapsed') {
+            el.style.display = 'none';
+            if (chevron) chevron.classList.add('collapsed');
+        } else {
+            el.style.display = 'block';
+            if (chevron) chevron.classList.remove('collapsed');
+        }
+    });
 });
+
+function toggleSidebarNode(id, event) {
+    if (event) {
+        // Prevent event from bubbling up to parents
+        event.stopPropagation();
+    }
+    const content = document.getElementById('content-' + id);
+    const chevron = document.getElementById('chevron-' + id);
+    if (!content || !chevron) return;
+    const isCollapsed = content.style.display === 'none';
+    if (isCollapsed) {
+        content.style.display = 'block';
+        chevron.classList.remove('collapsed');
+        localStorage.setItem('sidebar-' + id, 'expanded');
+    } else {
+        content.style.display = 'none';
+        chevron.classList.add('collapsed');
+        localStorage.setItem('sidebar-' + id, 'collapsed');
+    }
+}

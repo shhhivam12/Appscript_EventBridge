@@ -5,7 +5,7 @@
 <nav aria-label="breadcrumb" class="breadcrumb">
     <li class="breadcrumb-item"><a href="/workspaces/{{ workspace.id }}">{{ workspace.name }}</a></li>
     <li class="breadcrumb-item"><a href="/workspaces/{{ workspace.id }}/projects/{{ project.id }}">{{ project.name }}</a></li>
-    <li class="breadcrumb-item active">{{ workflow.name }}</li>
+    <li class="breadcrumb-item active" id="breadcrumbWfName">{{ workflow.name }}</li>
 </nav>
 {% endblock %}
 
@@ -19,13 +19,16 @@
                onchange="toggleStatus()" style="cursor:pointer">
     </div>
     <div class="wf-header-info">
-        <input type="text" class="wf-name-input" id="editName" value="{{ workflow.name }}">
+        <input type="text" class="wf-name-input" id="editName" value="{{ workflow.name }}" onchange="saveAll()">
         <input type="text" class="wf-desc-input" id="editDesc"
-               value="{{ workflow.description or '' }}" placeholder="Add a description…">
+               value="{{ workflow.description or '' }}" placeholder="Add a description…" onchange="saveAll()">
     </div>
     <div class="wf-header-actions">
         <span class="status-badge {{ workflow.status }}" id="statusBadge">{{ workflow.status }}</span>
-        <button class="btn-icon" onclick="deleteWorkflow()" title="Delete workflow">
+        <span class="badge bg-secondary-subtle text-secondary" style="font-size:11px" id="canvasStatsPill">
+            <i class="bi bi-activity"></i> {{ workflow.trigger_count or 0 }} runs
+        </span>
+        <button class="btn-icon text-danger" onclick="deleteWorkflow()" title="Delete workflow">
             <i class="bi bi-trash"></i>
         </button>
         <button class="btn btn-primary btn-sm" onclick="saveAll()" id="saveBtn">
@@ -34,301 +37,389 @@
     </div>
 </div>
 
-<div class="wf-builder">
-    <!-- Left: Flow -->
-    <div class="flow-column">
-
-        <!-- Trigger Node -->
-        <div class="node-pane trigger">
-            <div class="node-header">
-                <div class="node-icon trigger-icon"><i class="bi bi-broadcast"></i></div>
-                <div>
-                    <div class="node-title">Trigger</div>
-                    <div class="node-subtitle" id="triggerSummary">
-                        {{ workflow.trigger.source_app }} &middot; {{ workflow.trigger.event_type or 'not set' }}
-                    </div>
+<div class="row g-3">
+    <div class="col-12">
+        <div class="content-card" id="canvasCard" style="display: flex; flex-direction: column; overflow: hidden; position: relative;">
+            <div class="card-header-custom d-flex justify-content-between align-items-center flex-wrap gap-2" style="border-bottom: 1px solid var(--border); padding: 10px 15px;">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="m-0"><i class="bi bi-diagram-3-fill me-1" style="color:var(--accent-light)"></i>Workflow Canvas</h6>
+                    <span class="text-muted" style="font-size:11px;">(Drag nodes to arrange them. Double click to configure)</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary btn-sm px-2 py-1" onclick="autoLayout(true)" title="Auto Layout Nodes" style="font-size:11px;">
+                        <i class="bi bi-magic"></i> Auto Layout
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm px-2 py-1" id="maximizeBtn" onclick="toggleMaximize()" title="Maximize Canvas" style="font-size:11px;">
+                        <i class="bi bi-arrows-fullscreen"></i> Maximize
+                    </button>
                 </div>
             </div>
-            <div class="node-body">
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label">Credential (Source App)</label>
-                        <div class="d-flex gap-2">
-                            <select class="form-select" id="editCredential" onchange="onCredentialChange()" style="flex:1">
-                                <option value="">Select…</option>
-                                {% for cred in credentials %}
-                                <option value="{{ cred.id }}" data-app="{{ cred.app_type }}"
-                                    {{ 'selected' if cred.id == workflow.trigger.credential_id }}>
-                                    {{ cred.name }} ({{ cred.app_type }})
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <button class="btn btn-outline-primary btn-sm px-3" onclick="toggleNewCredential()" title="Add credential">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Inline cred panel -->
-                    <div class="col-12" id="inlineCredPanel" style="display:none">
-                        <div class="inline-cred-panel">
-                            <div class="inline-cred-header">
-                                <h6><i class="bi bi-key me-1"></i>New Credential</h6>
-                                <button class="btn-icon" onclick="toggleNewCredential()"><i class="bi bi-x"></i></button>
-                            </div>
-                            <div class="inline-cred-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Platform</label>
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        {% for key, schema in app_schemas.items() %}
-                                        <button class="btn btn-sm btn-outline-secondary cred-type-btn" data-type="{{ key }}" onclick="selectCredType('{{ key }}')">
-                                            <i class="bi {{ schema.icon }} me-1" style="color:{{ schema.color }}"></i>{{ schema.label }}
-                                        </button>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Name</label>
-                                    <input type="text" class="form-control form-control-sm" id="newCredName" placeholder="e.g., My ServiceNow Prod">
-                                </div>
-                                <div id="newCredFields"></div>
-                                <div class="d-flex gap-2 mt-3">
-                                    <button class="btn btn-primary btn-sm" onclick="saveInlineCredential()">
-                                        <i class="bi bi-check-lg me-1"></i>Save
-                                    </button>
-                                    <button class="btn btn-secondary btn-sm" onclick="toggleNewCredential()">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12">
-                        <label class="form-label">Event Type</label>
-                        <select class="form-select" id="editEventType"></select>
-                    </div>
-
-                    <!-- Webhook URL inline -->
-                    <div class="col-12">
-                        <label class="form-label">Webhook URL</label>
-                        <div class="d-flex gap-2 align-items-center">
-                            <code id="webhookUrl" style="flex:1;display:block;font-size:11px;padding:7px 10px;
-                                background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r-md);
-                                color:var(--orange-light);word-break:break-all;cursor:text;user-select:all">{{ base_url }}/webhook/{% if workflow.trigger.source_app == 'telegram' %}telegram/{{ workflow.trigger.credential_id }}{% elif workflow.trigger.source_app == 'servicenow' %}servicenow/{{ workflow.trigger.credential_id }}{% else %}trigger{% endif %}</code>
-                            <button class="btn-icon flex-shrink-0" onclick="copyText('webhookUrl')" title="Copy URL">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </div>
-                        <div style="font-size:10px;color:var(--text-3);margin-top:4px">
-                            {% if workflow.trigger.source_app == 'telegram' %}Telegram sends updates here automatically
-                            {% elif workflow.trigger.source_app == 'servicenow' %}Configure in ServiceNow Business Rules or Flow Designer
-                            {% else %}Send <code style="font-size:9px">X-API-Key</code> + <code style="font-size:9px">X-Event-Type</code> headers
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+            
+            <!-- Hidden payload text area for reference/variables/testing -->
+            <div style="display: none;">
+                <textarea id="testPayload">{{ test_payload }}</textarea>
+            </div>
+            
+            <div class="canvas-wrapper" id="canvasContainer">
+                <svg class="canvas-svg" id="canvasSvg">
+                    <defs>
+                      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#6C58AF" />
+                      </marker>
+                    </defs>
+                </svg>
+                <div class="nodes-container" id="nodesContainer"></div>
             </div>
         </div>
-
-        <!-- Connector + Filter Node -->
-        <div class="flow-connector">
-            <div class="connector-line"></div>
-        </div>
-
-        <!-- Filter Node -->
-        <div class="node-pane" id="filterNode" style="border-color:var(--warning);opacity:0.9">
-            <div class="node-header" onclick="toggleFilterBody()" style="cursor:pointer;user-select:none">
-                <div class="node-icon" style="background:rgba(234,179,8,.15)">
-                    <i class="bi bi-funnel-fill" style="color:var(--warning)"></i>
-                </div>
-                <div class="flex-grow-1">
-                    <div class="node-title">Filter
-                        <span style="font-size:10px;font-weight:400;color:var(--text-3)"> — optional</span>
-                    </div>
-                    <div class="node-subtitle" id="filterSummary">Disabled — all events pass through</div>
-                </div>
-                <!-- enable toggle (stops click propagation so header click doesn't double-fire) -->
-                <div class="form-check form-switch ms-2" onclick="event.stopPropagation()">
-                    <input class="form-check-input" type="checkbox" id="filterEnabled" onchange="onFilterToggle()" style="cursor:pointer">
-                </div>
-                <i class="bi bi-chevron-down ms-2" id="filterChevron" style="font-size:12px;color:var(--text-3);transition:transform .2s"></i>
-            </div>
-
-            <div class="node-body" id="filterBody" style="display:none">
-                <!-- Logic selector -->
-                <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:var(--text-2)">
-                    <span>Run action if</span>
-                    <select class="form-select form-select-sm" id="filterLogic" style="width:76px;font-size:12px">
-                        <option value="AND">ALL</option>
-                        <option value="OR">ANY</option>
-                    </select>
-                    <span>of the conditions match</span>
-                </div>
-
-                <!-- Condition rows -->
-                <div id="filterConditions"></div>
-
-                <button class="btn btn-secondary btn-sm mt-2" onclick="addCondition()" style="font-size:11px">
-                    <i class="bi bi-plus-lg me-1"></i>Add condition
-                </button>
-
-                <!-- Field reference hint -->
-                <div class="mt-3 p-2 rounded" style="background:var(--bg-3);font-size:10.5px;color:var(--text-3)">
-                    <i class="bi bi-lightbulb me-1" style="color:var(--warning)"></i>
-                    Field paths reference incoming payload data.
-                    Use <code style="font-size:10px">payload.field</code> or just <code style="font-size:10px">field</code>
-                    — e.g. <code style="font-size:10px">payload.priority</code>
-                </div>
-            </div>
-        </div>
-
-        <!-- Connector -->
-        <div class="flow-connector">
-            <div class="connector-line"></div>
-            <i class="bi bi-arrow-down-circle-fill" style="color:var(--border-hover);font-size:16px"></i>
-            <div class="connector-line"></div>
-        </div>
-
-        <!-- Action Node -->
-        <div class="node-pane action">
-            <div class="node-header">
-                <div class="node-icon action-icon"><i class="bi bi-lightning-charge-fill"></i></div>
-                <div class="flex-grow-1">
-                    <div class="node-title">Action</div>
-                    <div class="node-subtitle" id="actionSummary">
-                        {{ workflow.action.function_name or workflow.action.web_app_url or 'not configured' }}
-                    </div>
-                </div>
-                <div class="btn-group btn-group-sm ms-2">
-                    <input type="radio" class="btn-check" name="editActionType" id="editActionApi" value="apps_script_api"
-                           {{ 'checked' if workflow.action.type == 'apps_script_api' }} onchange="toggleEditAction()">
-                    <label class="btn btn-outline-secondary" for="editActionApi" style="font-size:11px">API</label>
-                    <input type="radio" class="btn-check" name="editActionType" id="editActionWeb" value="web_app"
-                           {{ 'checked' if workflow.action.type == 'web_app' }} onchange="toggleEditAction()">
-                    <label class="btn btn-outline-secondary" for="editActionWeb" style="font-size:11px">Web App</label>
-                </div>
-            </div>
-            <div class="node-body">
-                <!-- API fields -->
-                <div id="editApiFields" style="{{ 'display:none' if workflow.action.type == 'web_app' }}">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Apps Script Project</label>
-                            <select class="form-select" id="editScript" onchange="onScriptChange()">
-                                <option value="">Loading…</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Function</label>
-                            <select class="form-select" id="editFunction">
-                                <option value="">Select script first…</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <!-- Web App fields -->
-                <div id="editWebFields" style="{{ '' if workflow.action.type == 'web_app' else 'display:none' }}">
-                    <label class="form-label">Web App URL</label>
-                    <input type="text" class="form-control" id="editWebUrl"
-                           value="{{ workflow.action.web_app_url or '' }}"
-                           placeholder="https://script.google.com/macros/s/…/exec">
-                </div>
-
-                <!-- ── Parameter Mapping ─────────────────────────────────── -->
-                <div class="mt-4" id="paramSection">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div style="font-size:12px;font-weight:600;color:var(--text-2)">
-                            <i class="bi bi-sliders me-1" style="color:var(--accent-light)"></i>
-                            Parameters
-                        </div>
-                        <button class="btn btn-secondary btn-sm" onclick="addParam()" style="font-size:11px;padding:2px 9px">
-                            <i class="bi bi-plus-lg me-1"></i>Add
-                        </button>
-                    </div>
-
-                    <div id="paramRows"></div>
-
-                    <!-- Drop zone — drag a field chip here to create a new param row -->
-                    <div class="param-drop-zone" id="paramDropZone"
-                         ondragover="onDropZoneDragOver(event)"
-                         ondragleave="onDropZoneDragLeave(event)"
-                         ondrop="onDropZoneDrop(event)">
-                        <i class="bi bi-arrow-down-circle me-1"></i>
-                        Drop a field here to add a new parameter
-                    </div>
-
-                    <div class="mt-2 p-2 rounded" style="background:var(--bg-3);font-size:10.5px;color:var(--text-3)">
-                        <i class="bi bi-info-circle me-1" style="color:var(--accent-light)"></i>
-                        Pin a test payload above then <strong>drag fields</strong> into parameter values,
-                        or type <code style="font-size:10px">{{ '{{' }}payload.field{{ '}}' }}</code> manually.
-                        If no parameters are added, the full payload is passed as one argument.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div><!-- /flow-column -->
-
-    <!-- Right: Context panel -->
-    <div class="context-panel">
-
-        <!-- Test Panel -->
-        <div class="test-panel">
-            <div class="test-panel-header">
-                <h6><i class="bi bi-terminal me-1" style="color:var(--success)"></i>Trigger Output Payload</h6>
-                <button class="btn btn-primary btn-sm" onclick="runTest()" id="testBtn"
-                        style="font-size:11px;padding:4px 12px">
-                    <i class="bi bi-play-fill me-1"></i>Send
-                </button>
-            </div>
-            <div class="test-panel-body">
-                <textarea class="form-control test-payload" id="testPayload" rows="9">{{ test_payload }}</textarea>
-                <div id="testResult" style="display:none">
-                    <div class="test-result" id="testResultBody"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pinned Trigger Data Panel -->
-        <div class="pinned-data-panel" id="pinnedDataPanel" style="display:none">
-            <div class="pinned-data-header">
-                <div style="display:flex;align-items:center;gap:6px">
-                    <i class="bi bi-pin-fill" style="color:var(--accent-light);font-size:12px"></i>
-                    <span style="font-size:12px;font-weight:600;color:var(--text-1)">Trigger Data</span>
-                    <span id="pinnedFieldCount" style="font-size:10px;color:var(--text-3)"></span>
-                </div>
-            </div>
-            <div class="pinned-data-fields" id="pinnedFields"></div>
-            <div class="pinned-data-hint">
-                <i class="bi bi-hand-index me-1"></i>
-                Drag a field into a parameter value, or click it to insert at cursor
-            </div>
-        </div>
-
-        <!-- Quick Stats strip -->
-        <div style="display:flex;gap:12px;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-lg)">
-            <div style="flex:1;text-align:center">
-                <div style="font-size:18px;font-weight:700;color:var(--orange-light);font-variant-numeric:tabular-nums">{{ workflow.trigger_count or 0 }}</div>
-                <div style="font-size:10px;color:var(--text-3)">Triggers</div>
-            </div>
-            <div style="width:1px;background:var(--border)"></div>
-            <div style="flex:2;display:flex;flex-direction:column;justify-content:center">
-                <div style="font-size:10px;color:var(--text-3)">Last run</div>
-                <div style="font-size:11px;color:var(--text-2);font-family:'JetBrains Mono',monospace">{{ workflow.last_triggered[:16] if workflow.last_triggered else 'Never' }}</div>
-            </div>
-            <div style="flex:2;display:flex;align-items:center;justify-content:flex-end">
-                <a href="/events?workflow_id={{ workflow.id }}" class="btn btn-secondary btn-sm" style="font-size:11px">
-                    <i class="bi bi-activity me-1"></i>Event Logs
-                </a>
-            </div>
-        </div>
-
-    </div><!-- /context-panel -->
+    </div>
 </div>
 
-<!-- ── Filter condition row template (hidden) ── -->
-<template id="conditionRowTpl">
+<!-- ── Configure Node Modal ── -->
+<div class="modal fade" id="configureNodeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content" style="background: var(--bg-surface); border: 1px solid var(--border);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 15px 20px;">
+                <h5 class="modal-title" id="configureModalTitle" style="color: var(--text-1); font-weight: 700;">
+                    Configure Node
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="modal-split-container">
+                    <!-- Left: Configuration Form -->
+                    <div class="modal-split-left" id="modalConfigForm">
+                        
+                        <!-- Trigger Fields -->
+                        <div id="cfgTrigger" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Credential (Source App)</label>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select" id="nodeCred" onchange="onNodeCredChange()" style="flex:1">
+                                        <option value="">Select…</option>
+                                        {% for cred in credentials if cred.app_type not in ['gemini', 'openai'] %}
+                                        <option value="{{ cred.id }}" data-app="{{ cred.app_type }}"
+                                            {{ 'selected' if cred.id == workflow.trigger.credential_id }}>
+                                            {{ cred.name }} ({{ cred.app_type }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-outline-primary btn-sm px-3" onclick="toggleNewCredential()" title="Add credential">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Inline credential panel -->
+                            <div class="mb-3" id="inlineCredPanel" style="display:none">
+                                <div class="inline-cred-panel p-3 rounded border" style="background: var(--bg-elevated); border-color: var(--border);">
+                                    <div class="inline-cred-header d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="m-0"><i class="bi bi-key me-1"></i>New Credential</h6>
+                                        <button class="btn-icon" onclick="toggleNewCredential()"><i class="bi bi-x"></i></button>
+                                    </div>
+                                    <div class="inline-cred-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Platform</label>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                {% for key, schema in app_schemas.items() %}
+                                                <button class="btn btn-sm btn-outline-secondary cred-type-btn" data-type="{{ key }}" onclick="selectCredType('{{ key }}')">
+                                                    <i class="bi {{ schema.icon }} me-1" style="color:{{ schema.color }}"></i>{{ schema.label }}
+                                                </button>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Name</label>
+                                            <input type="text" class="form-control form-control-sm" id="newCredName" placeholder="e.g., My ServiceNow Prod">
+                                        </div>
+                                        <div id="newCredFields"></div>
+                                        <div class="d-flex gap-2 mt-3">
+                                            <button class="btn btn-primary btn-sm" onclick="saveInlineCredential()">
+                                                <i class="bi bi-check-lg me-1"></i>Save
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm" onclick="toggleNewCredential()">Cancel</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Event Type</label>
+                                <select class="form-select" id="nodeEventType" onchange="updateNodeWebhookInfo()"></select>
+                            </div>
+                        </div>
+
+                        <!-- Filter Fields -->
+                        <div id="cfgFilter" class="cfg-section" style="display:none;">
+                            <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:var(--text-2)">
+                                <span>Run action if</span>
+                                <select class="form-select form-select-sm" id="nodeFilterLogic" style="width:76px;font-size:12px">
+                                    <option value="AND">ALL</option>
+                                    <option value="OR">ANY</option>
+                                </select>
+                                <span>of the conditions match</span>
+                            </div>
+                            <div id="nodeFilterConditions"></div>
+                            <button class="btn btn-secondary btn-sm mt-2" onclick="addNodeCondition()" style="font-size:11px">
+                                <i class="bi bi-plus-lg me-1"></i>Add condition
+                            </button>
+                        </div>
+
+                        <!-- Apps Script Action Fields -->
+                        <div id="cfgAppsScript" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Apps Script Project</label>
+                                <select class="form-select" id="nodeScript" onchange="onNodeScriptChange()">
+                                    <option value="">Loading…</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Function</label>
+                                <select class="form-select" id="nodeFunction">
+                                    <option value="">Select script first…</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="form-label m-0">Parameters</label>
+                                    <button class="btn btn-secondary btn-sm" onclick="addNodeParam({}, 'nodeParamRows')" style="font-size:11px;padding:2px 9px">
+                                        <i class="bi bi-plus-lg me-1"></i>Add
+                                    </button>
+                                </div>
+                                <div id="nodeParamRows"></div>
+                                <div class="p-3 text-center border border-dashed rounded mt-2" id="nodeParamDropZone"
+                                     style="border-style: dashed !important; border-color: var(--border); color: var(--text-3); font-size:11px;"
+                                     ondragover="onParamDragOver(event)"
+                                     ondragleave="onParamDragLeave(event)"
+                                     ondrop="onParamDrop(event)">
+                                    <i class="bi bi-arrow-down-circle me-1"></i>
+                                    Drop a variable chip here to map parameter
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Web App Fields -->
+                        <div id="cfgWebApp" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Web App URL</label>
+                                <input type="text" class="form-control" id="nodeWebUrl" placeholder="https://script.google.com/macros/s/.../exec">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="form-label m-0">Parameters</label>
+                                    <button class="btn btn-secondary btn-sm" onclick="addNodeParam({}, 'nodeWebParamRows')" style="font-size:11px;padding:2px 9px">
+                                        <i class="bi bi-plus-lg me-1"></i>Add
+                                    </button>
+                                </div>
+                                <div id="nodeWebParamRows"></div>
+                            </div>
+                        </div>
+
+                        <!-- AI Agent Fields -->
+                        <div id="cfgAiAgent" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">AI Credential</label>
+                                <select class="form-select" id="nodeAiCred">
+                                    <option value="">Select AI Provider Credential...</option>
+                                    {% for cred in credentials %}
+                                        {% if cred.app_type in ['gemini', 'openai'] %}
+                                        <option value="{{ cred.id }}">{{ cred.name }} ({{ cred.app_type }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Model Name (Optional)</label>
+                                <input type="text" class="form-control" id="nodeAiModel" placeholder="e.g. gemini-2.5-flash or gpt-4o-mini">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Prompt Template</label>
+                                <textarea class="form-control" id="nodeAiPrompt" rows="8" placeholder="Enter instructions for AI. Use {{ '{{' }}payload.field{{ '}}' }} to inject variables."></textarea>
+                                <div style="font-size:10px;color:var(--text-3);margin-top:4px">
+                                    Pills from the Variables panel on the right can be clicked or dragged to insert.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- HTTP Request Fields -->
+                        <div id="cfgHttpRequest" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Request Method</label>
+                                <select class="form-select" id="nodeHttpMethod" onchange="toggleHttpMethodBody()">
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                    <option value="PATCH">PATCH</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">URL</label>
+                                <input type="text" class="form-control" id="nodeHttpUrl" placeholder="https://api.example.com/data">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="form-label m-0">Headers</label>
+                                    <button class="btn btn-secondary btn-sm" onclick="addNodeHttpHeader()" style="font-size:11px;padding:2px 9px">
+                                        <i class="bi bi-plus-lg me-1"></i>Add Header
+                                    </button>
+                                </div>
+                                <div id="nodeHttpHeaderRows"></div>
+                            </div>
+                            <div class="mb-3" id="nodeHttpBodySection">
+                                <label class="form-label">Body (raw)</label>
+                                <textarea class="form-control" id="nodeHttpBody" rows="5" placeholder='{"key": "value"}'></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Human In Loop Fields -->
+                        <div id="cfgHumanInLoop" class="cfg-section" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Instruction for Approval</label>
+                                <textarea class="form-control" id="nodeHumanInstruction" rows="4" placeholder="e.g. Please approve high priority incident processing..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Console & Variables -->
+                    <div class="modal-split-right d-flex flex-column">
+                        <div id="paneVariables" style="display:none; flex: 1; display:flex; flex-direction:column; min-height:0;">
+                            <div class="var-tree-header d-flex justify-content-between align-items-center mb-2">
+                                <span><i class="bi bi-tree-fill me-1"></i>Variables Explorer</span>
+                                <span style="font-size: 9px; color: var(--text-3);">Click or Drag to Map</span>
+                            </div>
+                            <div class="pinned-data-fields border rounded p-2 mb-3 flex-grow-1" id="modalVariablesTree" style="overflow-y:auto; background: var(--bg-base); max-height:220px;"></div>
+                            
+                            <div class="test-step-console border-top pt-3 mt-auto">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="m-0" style="font-size:12px; font-weight:700;"><i class="bi bi-terminal-fill me-1 text-success"></i>Test Node Step</h6>
+                                    <button class="btn btn-success btn-sm px-3" onclick="testStepNode()" id="testStepBtn" style="font-size:11px;">
+                                        <i class="bi bi-play-fill"></i> Test Step
+                                    </button>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-3); margin-bottom: 8px;">
+                                    Uses the sample payload to execute this specific node in isolation.
+                                </div>
+                                <div class="test-result-wrapper border rounded p-2" style="background: var(--bg-base); min-height: 100px; max-height:160px; overflow-y:auto;">
+                                    <pre id="testStepResult" class="m-0" style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-3); white-space: pre-wrap; word-break: break-all;">No execution run yet.</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="paneTriggerConsole" style="display:none; flex: 1; display:flex; flex-direction:column;">
+                            <div class="var-tree-header mb-2"><i class="bi bi-globe me-1"></i>Webhook Configurations</div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:11px;">Webhook Target URL</label>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <code id="nodeWebhookUrl" style="flex:1;display:block;font-size:10px;padding:7px 10px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r-md);color:var(--orange-light);word-break:break-all;user-select:all"></code>
+                                    <button class="btn btn-secondary btn-sm flex-shrink-0" onclick="copyText('nodeWebhookUrl')" title="Copy URL">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:11px;">Webhook Sample cURL</label>
+                                <div class="d-flex gap-2 align-items-start">
+                                    <textarea class="form-control" id="nodeWebhookCurl" rows="3" readonly style="font-family:'JetBrains Mono',monospace; font-size:10px; background:var(--bg-base); color: var(--text-2);"></textarea>
+                                    <button class="btn btn-secondary btn-sm flex-shrink-0" onclick="copyText('nodeWebhookCurl')" title="Copy Curl">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="webhook-listening-panel border rounded p-3 text-center mt-auto" id="listeningPanel" style="background: var(--bg-base);">
+                                <h6><i class="bi bi-rss me-1 text-danger animate-pulse"></i>Listen for Test Event</h6>
+                                <p style="font-size:11px; color:var(--text-3);">
+                                    Click below to start listening for webhook triggers from ServiceNow, Telegram or curl.
+                                </p>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-primary btn-sm px-4" id="listenBtn" onclick="startTriggerListen()">
+                                        <i class="bi bi-broadcast"></i> Start Listener
+                                    </button>
+                                    <button class="btn btn-danger btn-sm px-4" id="stopListenBtn" onclick="stopTriggerListen()" style="display:none">
+                                        <i class="bi bi-stop-fill"></i> Stop Listener
+                                    </button>
+                                </div>
+                                <div id="listenStatus" class="mt-2" style="font-size: 11px; font-weight:600; display:none;">
+                                    <span class="spinner-border spinner-border-sm me-1 text-orange-light"></span>
+                                    <span class="text-orange-light">Waiting for webhook trigger...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 15px 20px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveNodeConfig()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Add Step Modal ── -->
+<div class="modal fade" id="addNodeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background: var(--bg-surface); border: 1px solid var(--border);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border);">
+                <h5 class="modal-title" style="color: var(--text-1); font-weight: 700;">Add New Workflow Step</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size: 12px;">Select the type of node to insert into your workflow pipeline:</p>
+                <div class="d-flex flex-column gap-2">
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('ai_agent')">
+                        <i class="bi bi-magic" style="font-size: 20px; color: var(--accent-light);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">AI Agent / Large Language Model</div>
+                            <div style="font-size:11px; color: var(--text-3);">Run prompts on trigger payloads with Gemini or OpenAI</div>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('apps_script_api')">
+                        <i class="bi bi-lightning-charge-fill" style="font-size: 20px; color: var(--action-color);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">Apps Script Project Run</div>
+                            <div style="font-size:11px; color: var(--text-3);">Call functions in your connected Google Apps Script projects</div>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('web_app')">
+                        <i class="bi bi-globe" style="font-size: 20px; color: var(--info);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">Apps Script Web App</div>
+                            <div style="font-size:11px; color: var(--text-3);">POST event payload data directly to Google Web App URLs</div>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('filter')">
+                        <i class="bi bi-funnel-fill" style="font-size: 20px; color: var(--orange-light);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">Conditional Filter Node</div>
+                            <div style="font-size:11px; color: var(--text-3);">Stop/pass events based on logical evaluation of incoming keys</div>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('http_request')">
+                        <i class="bi bi-globe2" style="font-size: 20px; color: var(--success);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">HTTP API Request Node</div>
+                            <div style="font-size:11px; color: var(--text-3);">Trigger custom webhooks or call external APIs via GET/POST</div>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-3 p-3 text-start w-100" onclick="insertNode('human_in_loop')">
+                        <i class="bi bi-person-check-fill" style="font-size: 20px; color: var(--danger);"></i>
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-1); font-size:13px;">Human In The Loop Gate</div>
+                            <div style="font-size:11px; color: var(--text-3);">Pause the execution until manually approved from logs page</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Filter condition row template ── -->
+<template id="nodeConditionRowTpl">
     <div class="condition-row d-flex gap-2 mb-2 align-items-center">
-        <input type="text" class="form-control form-control-sm cond-field"
+        <input type="text" class="form-control form-control-sm cond-field animate-pulse"
                placeholder="payload.field" style="flex:2;font-size:12px;font-family:'JetBrains Mono',monospace">
         <select class="form-select form-select-sm cond-op" style="flex:1.2;font-size:12px">
             <option value="eq">= equals</option>
@@ -346,21 +437,35 @@
         </select>
         <input type="text" class="form-control form-control-sm cond-val"
                placeholder="value" style="flex:1.5;font-size:12px">
-        <button class="btn-icon flex-shrink-0" onclick="removeRow(this)" title="Remove">
+        <button class="btn-icon flex-shrink-0" onclick="removeNodeRow(this)" title="Remove">
             <i class="bi bi-x-lg" style="font-size:13px;color:var(--danger)"></i>
         </button>
     </div>
 </template>
 
-<!-- ── Parameter mapping row template (hidden) ── -->
-<template id="paramRowTpl">
+<!-- ── Parameter mapping row template ── -->
+<template id="nodeParamRowTpl">
     <div class="param-row d-flex gap-2 mb-2 align-items-center">
         <input type="text" class="form-control form-control-sm param-name"
                placeholder="paramName" style="flex:1;font-size:12px;font-family:'JetBrains Mono',monospace">
         <span style="font-size:13px;color:var(--text-3)">→</span>
         <input type="text" class="form-control form-control-sm param-value"
                placeholder="{{ '{{' }}payload.field{{ '}}' }} or static text" style="flex:2;font-size:12px">
-        <button class="btn-icon flex-shrink-0" onclick="removeRow(this)" title="Remove">
+        <button class="btn-icon flex-shrink-0" onclick="removeNodeRow(this)" title="Remove">
+            <i class="bi bi-x-lg" style="font-size:13px;color:var(--danger)"></i>
+        </button>
+    </div>
+</template>
+
+<!-- ── HTTP Header row template ── -->
+<template id="nodeHttpHeaderRowTpl">
+    <div class="header-row d-flex gap-2 mb-2 align-items-center">
+        <input type="text" class="form-control form-control-sm header-name"
+               placeholder="Header-Name" style="flex:1;font-size:12px;font-family:'JetBrains Mono',monospace">
+        <span style="font-size:13px;color:var(--text-3)">:</span>
+        <input type="text" class="form-control form-control-sm header-value"
+               placeholder="value" style="flex:2;font-size:12px">
+        <button class="btn-icon flex-shrink-0" onclick="removeNodeRow(this)" title="Remove">
             <i class="bi bi-x-lg" style="font-size:13px;color:var(--danger)"></i>
         </button>
     </div>
@@ -376,425 +481,852 @@ const WORKSPACE_ID = '{{ workspace.id }}';
 const SCHEMAS      = {{ app_schemas | tojson }};
 let selectedCredType = 'servicenow';
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// Canvas drag states
+let isDragging = false;
+let activeDragNodeId = null;
+let startX = 0, startY = 0;
+let initX = 0, initY = 0;
 
+// Config state
+let activeConfigNodeId = null;
+let lastStepResults = {};
+let lastFocusedInput = null;
+
+// Add node insertion placeholders
+let parentInsertId = null;
+let childInsertId = null;
+
+// Webhook polling intervals
+let listenInterval = null;
+let listenTimeout = null;
+
+// Initializer
 document.addEventListener('DOMContentLoaded', () => {
-    loadScripts();
-    populateEventTypes();
-    initFilter();
-    initParams();
-    // Always show Trigger Data panel pre-populated from the sample payload
-    pinCurrentPayload();
+    // Coordinate upgrade check
+    autoLayout(false);
+    
+    // Global track focus inside configuration modals for mapping variables
+    document.addEventListener('focusin', (e) => {
+        if (e.target.matches('#modalConfigForm input[type="text"], #modalConfigForm textarea')) {
+            lastFocusedInput = e.target;
+        }
+    });
 });
 
-// ── Trigger ───────────────────────────────────────────────────────────────────
+// ── Visual Canvas Grid Renderers ──────────────────────────────────────────────
 
-function populateEventTypes() {
-    const sel     = document.getElementById('editCredential');
-    const appType = sel.options[sel.selectedIndex]?.dataset?.app || 'custom';
-    const schema  = SCHEMAS[appType] || SCHEMAS['custom'];
-    document.getElementById('editEventType').innerHTML =
-        schema.webhook_events.map(e =>
-            `<option value="${e}" ${e === WF.trigger.event_type ? 'selected' : ''}>${e}</option>`
-        ).join('');
+function autoLayout(force = false) {
+    const ordered = [];
+    const visited = new Set();
+    
+    function traverse(nodeId) {
+        if (!nodeId || visited.has(nodeId)) return;
+        visited.add(nodeId);
+        ordered.push(nodeId);
+        const node = WF.nodes[nodeId];
+        if (node && node.next) {
+            for (const childId of node.next) {
+                traverse(childId);
+            }
+        }
+    }
+    
+    // Always start with 'trigger'
+    traverse('trigger');
+    
+    // Add any disconnected or unreachable nodes just in case
+    for (const id of Object.keys(WF.nodes)) {
+        if (!visited.has(id)) {
+            ordered.push(id);
+        }
+    }
+    
+    let x = 80;
+    let y = 200;
+    for (const id of ordered) {
+        const node = WF.nodes[id];
+        if (node) {
+            if (force || !node.position || node.position.x === undefined || node.position.y === undefined) {
+                node.position = { x: x, y: y };
+            }
+            x += 350;
+        }
+    }
+    renderCanvas();
 }
 
-function onCredentialChange() { populateEventTypes(); }
+function renderCanvas() {
+    const container = document.getElementById('nodesContainer');
+    container.innerHTML = '';
+    
+    for (const [id, node] of Object.entries(WF.nodes)) {
+        const card = document.createElement('div');
+        card.className = `node-card ${node.type}-node`;
+        card.style.left = `${node.position.x}px`;
+        card.style.top = `${node.position.y}px`;
+        card.id = `node-${node.id}`;
+        
+        // Define Bootstrap icon class depending on node type
+        let icon = 'bi-plug';
+        if (node.type === 'trigger') icon = 'bi-broadcast text-orange-light';
+        else if (node.type === 'filter') icon = 'bi-funnel-fill text-warning';
+        else if (node.type === 'apps_script_api') icon = 'bi-lightning-charge-fill text-primary';
+        else if (node.type === 'web_app') icon = 'bi-globe text-info';
+        else if (node.type === 'ai_agent') icon = 'bi-magic text-accent-light';
+        else if (node.type === 'http_request') icon = 'bi-globe2 text-success';
+        else if (node.type === 'human_in_loop') icon = 'bi-person-check-fill text-danger';
+        
+        // Build subtitle details dynamically
+        let sub = 'Double-click to set';
+        if (node.type === 'trigger') {
+            sub = `${node.config.source_app || 'custom'} · ${node.config.event_type || 'any'}`;
+        } else if (node.type === 'apps_script_api') {
+            sub = node.config.function_name || 'Apps Script';
+        } else if (node.type === 'web_app') {
+            sub = node.config.web_app_url ? truncateStr(node.config.web_app_url, 25) : 'Web App';
+        } else if (node.type === 'ai_agent') {
+            sub = node.config.model || 'Gemini/OpenAI';
+        } else if (node.type === 'filter') {
+            sub = `${node.config.logic || 'AND'} (${(node.config.conditions || []).length} rules)`;
+        } else if (node.type === 'http_request') {
+            sub = `${node.config.method || 'GET'} · ${node.config.url ? truncateStr(node.config.url, 20) : 'API'}`;
+        } else if (node.type === 'human_in_loop') {
+            sub = node.config.instruction ? truncateStr(node.config.instruction, 22) : 'Awaiting manual approval';
+        }
+        
+        card.innerHTML = `
+            <div class="node-card-body">
+                <div class="node-card-icon" style="background: rgba(255,255,255,0.03); border-radius: var(--r-md); width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi ${icon}"></i>
+                </div>
+                <div class="node-card-content">
+                    <div class="node-card-text">${escapeHtml(node.name || id)}</div>
+                    <div class="node-card-subtext">${escapeHtml(sub)}</div>
+                </div>
+                <div class="node-card-actions">
+                    <button class="btn-icon p-1 text-secondary" onclick="event.stopPropagation(); openNodeConfig('${node.id}')" title="Configure step">
+                        <i class="bi bi-sliders"></i>
+                    </button>
+                    ${node.id !== 'trigger' ? `
+                    <button class="btn-icon p-1 text-danger" onclick="event.stopPropagation(); deleteNode('${node.id}')" title="Delete step">
+                        <i class="bi bi-trash-fill" style="font-size:11px;"></i>
+                    </button>` : ''}
+                </div>
+            </div>`;
+            
+        // Drag listener setup
+        card.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+            isDragging = true;
+            activeDragNodeId = node.id;
+            startX = e.clientX;
+            startY = e.clientY;
+            initX = node.position.x;
+            initY = node.position.y;
+            card.classList.add('dragging');
+            e.preventDefault();
+        });
+        
+        card.addEventListener('dblclick', () => {
+            openNodeConfig(node.id);
+        });
+        
+        container.appendChild(card);
+    }
+    
+    drawConnections();
+}
 
-// ── Action / Scripts ──────────────────────────────────────────────────────────
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging || !activeDragNodeId) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const node = WF.nodes[activeDragNodeId];
+    if (node) {
+        node.position.x = initX + dx;
+        node.position.y = initY + dy;
+        const el = document.getElementById(`node-${activeDragNodeId}`);
+        if (el) {
+            el.style.left = `${node.position.x}px`;
+            el.style.top = `${node.position.y}px`;
+        }
+        drawConnections();
+    }
+});
 
-async function loadScripts() {
-    const sel = document.getElementById('editScript');
+window.addEventListener('mouseup', () => {
+    if (isDragging && activeDragNodeId) {
+        const el = document.getElementById(`node-${activeDragNodeId}`);
+        if (el) el.classList.remove('dragging');
+        isDragging = false;
+        activeDragNodeId = null;
+        // Quiet save layout positions
+        saveAllQuietly();
+    }
+});
+
+function drawConnections() {
+    const svg = document.getElementById('canvasSvg');
+    const defs = svg.querySelector('defs');
+    svg.innerHTML = '';
+    if (defs) svg.appendChild(defs);
+    
+    // Clear all connection plus buttons
+    document.querySelectorAll('.canvas-add-btn').forEach(b => b.remove());
+    
+    const cardWidth = 250;
+    const cardHeight = 60; // Approx height of card
+    
+    for (const [id, node] of Object.entries(WF.nodes)) {
+        if (!node.next) continue;
+        
+        node.next.forEach(childId => {
+            const child = WF.nodes[childId];
+            if (!child) return;
+            
+            const x1 = node.position.x + cardWidth;
+            const y1 = node.position.y + cardHeight / 2;
+            const x2 = child.position.x;
+            const y2 = child.position.y + cardHeight / 2;
+            
+            const dx = Math.abs(x2 - x1) * 0.5;
+            const pathData = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathData);
+            path.setAttribute('stroke', '#6C58AF');
+            path.setAttribute('stroke-width', '3');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('marker-end', 'url(#arrow)');
+            svg.appendChild(path);
+            
+            // Add connection midpoint plus button
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            
+            const addBtn = document.createElement('div');
+            addBtn.className = 'canvas-add-btn';
+            addBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
+            addBtn.style.left = `${midX - 12}px`;
+            addBtn.style.top = `${midY - 12}px`;
+            addBtn.title = 'Insert new node step';
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAddNodeModal(id, childId);
+            });
+            document.getElementById('nodesContainer').appendChild(addBtn);
+        });
+        
+        // Show append step button on leaf nodes
+        if (!node.next || node.next.length === 0) {
+            const addBtn = document.createElement('div');
+            addBtn.className = 'canvas-add-btn';
+            addBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
+            addBtn.style.left = `${node.position.x + cardWidth + 20}px`;
+            addBtn.style.top = `${node.position.y + cardHeight / 2 - 12}px`;
+            addBtn.title = 'Append workflow step';
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAddNodeModal(id, null);
+            });
+            document.getElementById('nodesContainer').appendChild(addBtn);
+        }
+    }
+}
+
+// ── Step Insertion / Add Modals ──────────────────────────────────────────────
+
+function openAddNodeModal(parentId, childId) {
+    parentInsertId = parentId;
+    childInsertId = childId;
+    const modalEl = document.getElementById('addNodeModal');
+    new bootstrap.Modal(modalEl).show();
+}
+
+function insertNode(type) {
+    const modalEl = document.getElementById('addNodeModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+    
+    const newId = `node_${Date.now()}`;
+    const parentNode = WF.nodes[parentInsertId];
+    
+    // Coordinate solver
+    let nextX = parentNode.position.x + 350;
+    let nextY = parentNode.position.y;
+    
+    if (childInsertId) {
+        const childNode = WF.nodes[childInsertId];
+        if (childNode) {
+            nextX = (parentNode.position.x + childNode.position.x) / 2;
+            nextY = (parentNode.position.y + childNode.position.y) / 2;
+        }
+    }
+    
+    const newNode = {
+        id: newId,
+        type: type,
+        name: getDefaultName(type),
+        config: getDefaultConfig(type),
+        position: { x: nextX, y: nextY },
+        next: childInsertId ? [childInsertId] : []
+    };
+    
+    WF.nodes[newId] = newNode;
+    
+    // Parent connector rewiring
+    let parentNext = parentNode.next || [];
+    if (childInsertId) {
+        const idx = parentNext.indexOf(childInsertId);
+        if (idx !== -1) {
+            parentNext[idx] = newId;
+        } else {
+            parentNext.push(newId);
+        }
+    } else {
+        parentNext.push(newId);
+    }
+    parentNode.next = parentNext;
+    
+    renderCanvas();
+    saveAll();
+    
+    // Auto configure newly created node immediately
+    openNodeConfig(newId);
+}
+
+function deleteNode(nodeId) {
+    if (nodeId === 'trigger') {
+        showToast("Trigger node cannot be deleted", "error");
+        return;
+    }
+    confirmDelete(`Delete this step node "${WF.nodes[nodeId].name || nodeId}"?`, () => {
+        // Rewire all parents of nodeId to nodeId's children
+        for (const [id, node] of Object.entries(WF.nodes)) {
+            if (node.next && node.next.includes(nodeId)) {
+                const idx = node.next.indexOf(nodeId);
+                if (idx !== -1) {
+                    const children = WF.nodes[nodeId].next || [];
+                    node.next.splice(idx, 1, ...children);
+                }
+            }
+        }
+        
+        delete WF.nodes[nodeId];
+        delete lastStepResults[nodeId];
+        
+        renderCanvas();
+        saveAll();
+    });
+}
+
+function getDefaultName(type) {
+    switch(type) {
+        case 'ai_agent': return 'AI Agent Prompt';
+        case 'apps_script_api': return 'Apps Script API';
+        case 'web_app': return 'Web App Trigger';
+        case 'filter': return 'Filter Node';
+        case 'http_request': return 'HTTP Request';
+        case 'human_in_loop': return 'Human Gate';
+        default: return 'Step Node';
+    }
+}
+
+function getDefaultConfig(type) {
+    switch(type) {
+        case 'ai_agent': return { credential_id: '', model: 'gemini-2.5-flash', prompt: '' };
+        case 'apps_script_api': return { script_id: '', script_name: '', function_name: '', parameters: [] };
+        case 'web_app': return { web_app_url: '', parameters: [] };
+        case 'filter': return { logic: 'AND', conditions: [] };
+        case 'http_request': return { method: 'GET', url: '', headers: [], body: '' };
+        case 'human_in_loop': return { instruction: '' };
+        default: return {};
+    }
+}
+
+// ── Node Configuration Modal Controls ────────────────────────────────────────
+
+function openNodeConfig(nodeId) {
+    activeConfigNodeId = nodeId;
+    const node = WF.nodes[nodeId];
+    if (!node) return;
+    
+    document.getElementById('configureModalTitle').textContent = `Configure Node: ${node.name || nodeId}`;
+    
+    // Hide all forms first
+    document.querySelectorAll('.cfg-section').forEach(s => s.style.display = 'none');
+    
+    // Map form values depending on node type
+    if (node.type === 'trigger') {
+        document.getElementById('cfgTrigger').style.display = 'block';
+        document.getElementById('paneTriggerConsole').style.display = 'block';
+        document.getElementById('paneVariables').style.display = 'none';
+        
+        document.getElementById('nodeCred').value = node.config.credential_id || '';
+        populateNodeEventTypes();
+    }
+    else {
+        document.getElementById('paneTriggerConsole').style.display = 'none';
+        document.getElementById('paneVariables').style.display = 'block';
+        
+        // Render variables pane
+        renderVariablesExplorer();
+        
+        if (node.type === 'filter') {
+            document.getElementById('cfgFilter').style.display = 'block';
+            document.getElementById('nodeFilterLogic').value = node.config.logic || 'AND';
+            document.getElementById('nodeFilterConditions').innerHTML = '';
+            (node.config.conditions || []).forEach(c => addNodeCondition(c));
+        }
+        else if (node.type === 'apps_script_api') {
+            document.getElementById('cfgAppsScript').style.display = 'block';
+            document.getElementById('nodeParamRows').innerHTML = '';
+            (node.config.parameters || []).forEach(p => addNodeParam(p, 'nodeParamRows'));
+            loadNodeScripts(node.config.script_id);
+        }
+        else if (node.type === 'web_app') {
+            document.getElementById('cfgWebApp').style.display = 'block';
+            document.getElementById('nodeWebUrl').value = node.config.web_app_url || '';
+            document.getElementById('nodeWebParamRows').innerHTML = '';
+            (node.config.parameters || []).forEach(p => addNodeParam(p, 'nodeWebParamRows'));
+        }
+        else if (node.type === 'ai_agent') {
+            document.getElementById('cfgAiAgent').style.display = 'block';
+            document.getElementById('nodeAiCred').value = node.config.credential_id || '';
+            document.getElementById('nodeAiModel').value = node.config.model || 'gemini-2.5-flash';
+            document.getElementById('nodeAiPrompt').value = node.config.prompt || '';
+        }
+        else if (node.type === 'http_request') {
+            document.getElementById('cfgHttpRequest').style.display = 'block';
+            document.getElementById('nodeHttpMethod').value = node.config.method || 'GET';
+            document.getElementById('nodeHttpUrl').value = node.config.url || '';
+            document.getElementById('nodeHttpHeaderRows').innerHTML = '';
+            (node.config.headers || []).forEach(h => addNodeHttpHeader(h));
+            document.getElementById('nodeHttpBody').value = node.config.body || '';
+            toggleHttpMethodBody();
+        }
+        else if (node.type === 'human_in_loop') {
+            document.getElementById('cfgHumanInLoop').style.display = 'block';
+            document.getElementById('nodeHumanInstruction').value = node.config.instruction || '';
+        }
+        
+        // Render step results
+        const lastRes = lastStepResults[nodeId];
+        const resPre = document.getElementById('testStepResult');
+        if (lastRes) {
+            resPre.textContent = JSON.stringify(lastRes, null, 2);
+            resPre.style.color = lastRes.status === 'failed' ? '#f87171' : '#7ee787';
+        } else {
+            resPre.textContent = 'No test run execution yet.';
+            resPre.style.color = 'var(--text-3)';
+        }
+    }
+    
+    // Open Modal
+    const modalEl = document.getElementById('configureNodeModal');
+    new bootstrap.Modal(modalEl).show();
+}
+
+function saveNodeConfig() {
+    saveActiveConfigToState();
+    
+    renderCanvas();
+    saveAll();
+    
+    const modalEl = document.getElementById('configureNodeModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+}
+
+function saveActiveConfigToState() {
+    const node = WF.nodes[activeConfigNodeId];
+    if (!node) return;
+    
+    if (node.type === 'trigger') {
+        const credSel = document.getElementById('nodeCred');
+        node.config.credential_id = credSel.value;
+        node.config.source_app = credSel.options[credSel.selectedIndex]?.dataset?.app || 'custom';
+        node.config.event_type = document.getElementById('nodeEventType').value;
+    }
+    else if (node.type === 'filter') {
+        node.config.logic = document.getElementById('nodeFilterLogic').value;
+        node.config.conditions = getModalFilterConditions();
+    }
+    else if (node.type === 'apps_script_api') {
+        const scriptSel = document.getElementById('nodeScript');
+        node.config.script_id = scriptSel.value;
+        node.config.script_name = scriptSel.options[scriptSel.selectedIndex]?.textContent || '';
+        node.config.function_name = document.getElementById('nodeFunction').value;
+        node.config.parameters = getModalParams('nodeParamRows');
+    }
+    else if (node.type === 'web_app') {
+        node.config.web_app_url = document.getElementById('nodeWebUrl').value;
+        node.config.parameters = getModalParams('nodeWebParamRows');
+    }
+    else if (node.type === 'ai_agent') {
+        node.config.credential_id = document.getElementById('nodeAiCred').value;
+        node.config.model = document.getElementById('nodeAiModel').value;
+        node.config.prompt = document.getElementById('nodeAiPrompt').value;
+    }
+    else if (node.type === 'http_request') {
+        node.config.method = document.getElementById('nodeHttpMethod').value;
+        node.config.url = document.getElementById('nodeHttpUrl').value;
+        node.config.headers = getModalHttpHeaders();
+        node.config.body = document.getElementById('nodeHttpBody').value;
+    }
+    else if (node.type === 'human_in_loop') {
+        node.config.instruction = document.getElementById('nodeHumanInstruction').value;
+    }
+}
+
+// ── Webhook Trigger Settings ──────────────────────────────────────────────────
+
+function populateNodeEventTypes() {
+    const sel = document.getElementById('nodeCred');
+    const appType = sel.options[sel.selectedIndex]?.dataset?.app || 'custom';
+    const schema = SCHEMAS[appType] || SCHEMAS['custom'];
+    
+    const eventTypeSel = document.getElementById('nodeEventType');
+    const activeNode = WF.nodes[activeConfigNodeId];
+    const savedEvent = activeNode ? activeNode.config.event_type : '';
+    
+    eventTypeSel.innerHTML = schema.webhook_events.map(e =>
+        `<option value="${e}" ${e === savedEvent ? 'selected' : ''}>${e}</option>`
+    ).join('');
+    
+    updateNodeWebhookInfo();
+}
+
+function onNodeCredChange() {
+    populateNodeEventTypes();
+}
+
+function updateNodeWebhookInfo() {
+    const sel = document.getElementById('nodeCred');
+    const credId = sel.value;
+    const appType = sel.options[sel.selectedIndex]?.dataset?.app || 'custom';
+    const eventType = document.getElementById('nodeEventType').value || 'custom';
+    
+    let path = 'trigger';
+    if (appType === 'telegram' && credId) {
+        path = `telegram/${credId}`;
+    } else if (appType === 'servicenow' && credId) {
+        path = `servicenow/${credId}`;
+    } else if (['google_chat', 'gmail', 'google_drive', 'google_sheets', 'google_calendar'].includes(appType) && credId) {
+        path = `google/${appType}/${credId}`;
+    }
+    
+    const fullUrl = `{{ base_url }}/webhook/${path}`;
+    document.getElementById('nodeWebhookUrl').textContent = fullUrl;
+    
+    // cURL Command Help Generator
+    let headers = `-H "Content-Type: application/json"`;
+    if (appType === 'custom') {
+        headers += ` -H "X-API-Key: YOUR_API_KEY" -H "X-Event-Type: ${eventType}"`;
+    }
+    
+    let sampleData = '{"message": "Hello from Astreya AppScript Bridge"}';
+    if (appType === 'telegram') {
+        sampleData = '{"message": {"chat": {"id": 12345}, "text": "/start"}}';
+    } else if (appType === 'servicenow') {
+        sampleData = '{"number": "INC0010001", "short_description": "Example ServiceNow incident priority 3"}';
+    } else if (appType === 'google_chat') {
+        sampleData = '{"type": "MESSAGE", "message": {"text": "Hello bot"}, "space": {"name": "spaces/AAAAbbbb"}}';
+    } else if (appType === 'gmail') {
+        sampleData = '{"message": {"data": "eyJlbWFpbEFkZHJlc3MiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaGlzdG9yeUlkIjoiMTIzNDU2In0="}}';
+    } else if (appType === 'google_drive') {
+        sampleData = '{"resource_state": "update", "resource_id": "file_12345"}';
+    } else if (appType === 'google_sheets') {
+        sampleData = '{"event": "row.added", "spreadsheet_id": "sheet_123456", "values": ["data1", "data2"]}';
+    } else if (appType === 'google_calendar') {
+        sampleData = '{"resource_state": "exists", "event_id": "event_789abc"}';
+    }
+    
+    document.getElementById('nodeWebhookCurl').value = `curl -X POST ${headers} -d '${sampleData}' ${fullUrl}`;
+}
+
+// ── Webhook Short Poller / Listener ───────────────────────────────────────────
+
+function startTriggerListen() {
+    const listenBtn = document.getElementById('listenBtn');
+    const stopListenBtn = document.getElementById('stopListenBtn');
+    const listenStatus = document.getElementById('listenStatus');
+    const listenPanel = document.getElementById('listeningPanel');
+    
+    listenBtn.style.display = 'none';
+    stopListenBtn.style.display = '';
+    listenStatus.style.display = 'block';
+    listenPanel.classList.add('listening-state');
+    
+    api.post(`/api/workflows/${WF.id}/test-trigger/start`)
+        .then(res => {
+            if (!res.success) {
+                showToast("Failed to start webhook listener", "error");
+                stopTriggerListenState();
+                return;
+            }
+            
+            showToast("Webhook listener is active. Send your test webhook event now.", "info");
+            
+            listenInterval = setInterval(() => {
+                api.get(`/api/workflows/${WF.id}/test-trigger/poll`)
+                    .then(pollRes => {
+                        if (pollRes.success && pollRes.payload) {
+                            clearInterval(listenInterval);
+                            clearTimeout(listenTimeout);
+                            
+                            const formatted = JSON.stringify(pollRes.payload, null, 2);
+                            document.getElementById('testPayload').value = formatted;
+                            
+                            showToast("Webhook payload captured and pinned successfully!", "success");
+                            stopTriggerListenState();
+                        }
+                    })
+                    .catch(err => console.error(err));
+            }, 1500);
+            
+            listenTimeout = setTimeout(() => {
+                clearInterval(listenInterval);
+                showToast("Webhook listener timed out. No request captured.", "warning");
+                stopTriggerListenState();
+            }, 60000);
+        })
+        .catch(err => {
+            showToast("Listener start error: " + err.message, "error");
+            stopTriggerListenState();
+        });
+}
+
+function stopTriggerListen() {
+    if (listenInterval) clearInterval(listenInterval);
+    if (listenTimeout) clearTimeout(listenTimeout);
+    
+    api.post(`/api/workflows/${WF.id}/test-trigger/stop`)
+        .catch(err => console.error(err));
+        
+    showToast("Webhook listener stopped.", "info");
+    stopTriggerListenState();
+}
+
+function stopTriggerListenState() {
+    document.getElementById('listenBtn').style.display = '';
+    document.getElementById('stopListenBtn').style.display = 'none';
+    document.getElementById('listenStatus').style.display = 'none';
+    document.getElementById('listeningPanel').classList.remove('listening-state');
+}
+
+// ── Step Tester Simulator ─────────────────────────────────────────────────────
+
+async function testStepNode() {
+    const testStepBtn = document.getElementById('testStepBtn');
+    const resultPre = document.getElementById('testStepResult');
+    
+    testStepBtn.disabled = true;
+    testStepBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Executing...';
+    resultPre.textContent = 'Simulating workflow up to this step...';
+    resultPre.style.color = 'var(--text-3)';
+    
+    saveActiveConfigToState();
+    
+    let samplePayload = {};
+    try {
+        samplePayload = JSON.parse(document.getElementById('testPayload').value);
+    } catch(e) {
+        showToast("Invalid JSON in sample trigger payload text", "error");
+        testStepBtn.disabled = false;
+        testStepBtn.innerHTML = '<i class="bi bi-play-fill"></i> Test Step';
+        resultPre.textContent = 'Error: Invalid JSON payload';
+        resultPre.style.color = '#f87171';
+        return;
+    }
+    
+    try {
+        const res = await api.post(`/api/workflows/${WF.id}/test-step`, {
+            nodes: WF.nodes,
+            node_id: activeConfigNodeId,
+            payload: samplePayload
+        });
+        
+        lastStepResults[activeConfigNodeId] = res;
+        resultPre.textContent = JSON.stringify(res, null, 2);
+        
+        if (res.status === 'failed') {
+            resultPre.style.color = '#f87171';
+            showToast("Test Step node run failed", "error");
+        } else {
+            resultPre.style.color = '#7ee787';
+            showToast("Test Step completed successfully", "success");
+            renderVariablesExplorer();
+        }
+    } catch(e) {
+        resultPre.textContent = 'Error: ' + e.message;
+        resultPre.style.color = '#f87171';
+        showToast("Execution failure on step test", "error");
+    } finally {
+        testStepBtn.disabled = false;
+        testStepBtn.innerHTML = '<i class="bi bi-play-fill"></i> Test Step';
+    }
+}
+
+// ── Variables Explorer Render & Drag/Drop ─────────────────────────────────────
+
+function renderVariablesExplorer() {
+    const treeEl = document.getElementById('modalVariablesTree');
+    treeEl.innerHTML = '';
+    
+    let triggerVars = [];
+    try {
+        const payloadText = document.getElementById('testPayload').value;
+        triggerVars = flattenObject(JSON.parse(payloadText), 'payload');
+    } catch(e) {}
+    
+    let html = '';
+    
+    // Trigger Variables
+    html += `
+        <div class="var-node-group">
+            <div class="var-node-title" onclick="toggleVarGroup('grp-trigger')">
+                <i class="bi bi-chevron-down"></i>Trigger Payload (payload.*)
+            </div>
+            <div id="grp-trigger" class="var-group-content">`;
+    if (triggerVars.length === 0) {
+        html += `<div class="text-muted p-2" style="font-size:10px;">No payload variables found.</div>`;
+    } else {
+        triggerVars.forEach(v => {
+            html += `
+                <div class="var-pill" draggable="true" data-path="${v.path}" ondragstart="onVarDragStart(event, this)" onclick="onVarClick(this)">
+                    <span class="var-pill-path">${v.path}</span>
+                    <span class="var-pill-val">${escapeHtml(truncateStr(String(v.value ?? ''), 15))}</span>
+                </div>`;
+        });
+    }
+    html += `</div></div>`;
+    
+    // Parent steps outputs
+    for (const [id, node] of Object.entries(WF.nodes)) {
+        if (id === 'trigger' || id === activeConfigNodeId) continue;
+        
+        const stepPath = `steps.${id}.response`;
+        
+        html += `
+            <div class="var-node-group">
+                <div class="var-node-title" onclick="toggleVarGroup('grp-${id}')">
+                    <i class="bi bi-chevron-down"></i>${node.name} (steps.${id}.response)
+                </div>
+                <div id="grp-${id}" class="var-group-content">`;
+                
+        const lastResult = lastStepResults[id];
+        if (lastResult && lastResult.status === 'success' && lastResult.response) {
+            const stepVars = flattenObject(lastResult.response, `steps.${id}.response`);
+            stepVars.forEach(v => {
+                html += `
+                    <div class="var-pill" draggable="true" data-path="${v.path}" ondragstart="onVarDragStart(event, this)" onclick="onVarClick(this)">
+                        <span class="var-pill-path">${v.path}</span>
+                        <span class="var-pill-val">${escapeHtml(truncateStr(String(v.value ?? ''), 15))}</span>
+                    </div>`;
+            });
+        } else {
+            html += `
+                <div class="var-pill" draggable="true" data-path="${stepPath}" ondragstart="onVarDragStart(event, this)" onclick="onVarClick(this)">
+                    <span class="var-pill-path">${stepPath}</span>
+                    <span class="var-pill-val">dynamic JSON output</span>
+                </div>`;
+        }
+        
+        html += `</div></div>`;
+    }
+    
+    treeEl.innerHTML = html;
+}
+
+function toggleVarGroup(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function onVarDragStart(e, pill) {
+    const expr = '{' + '{' + pill.dataset.path + '}' + '}';
+    e.dataTransfer.setData('text/plain', expr);
+    e.dataTransfer.effectAllowed = 'copy';
+}
+
+function onVarClick(pill) {
+    const expr = '{' + '{' + pill.dataset.path + '}' + '}';
+    if (lastFocusedInput && document.getElementById('modalConfigForm').contains(lastFocusedInput)) {
+        insertTextAtCursor(lastFocusedInput, expr);
+    } else {
+        showToast("Click a text input field first, then click the variable to insert", "info");
+    }
+}
+
+// ── Drag Mappings onto Drop Zone ──────────────────────────────────────────────
+
+function onParamDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    document.getElementById('nodeParamDropZone').classList.add('drag-target-highlight');
+}
+
+function onParamDragLeave() {
+    document.getElementById('nodeParamDropZone').classList.remove('drag-target-highlight');
+}
+
+function onParamDrop(e) {
+    e.preventDefault();
+    document.getElementById('nodeParamDropZone').classList.remove('drag-target-highlight');
+    const expr = e.dataTransfer.getData('text/plain');
+    if (!expr) return;
+    
+    // Deduce param name from path
+    let name = 'param';
+    const match = expr.match(/\{\{payload\.(?:.*\.)?([^}]+)\}\}/) || expr.match(/\{\{steps\.[^.]+\.response\.(?:.*\.)?([^}]+)\}\}/);
+    if (match) name = match[1];
+    
+    addNodeParam({ name, value: expr }, 'nodeParamRows');
+}
+
+// ── Apps Script APIs / Load Scripts & Functions ───────────────────────────────
+
+async function loadNodeScripts(selectedScriptId) {
+    const sel = document.getElementById('nodeScript');
+    sel.innerHTML = '<option value="">Loading scripts…</option>';
     try {
         const r = await api.get('/api/scripts');
         if (r.success) {
             sel.innerHTML = '<option value="">Choose script…</option>' +
                 r.scripts.map(s =>
-                    `<option value="${s.scriptId}" ${s.scriptId === WF.action.script_id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+                    `<option value="${s.scriptId}" ${s.scriptId === selectedScriptId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
                 ).join('');
-            if (WF.action.script_id) onScriptChange();
+            if (selectedScriptId) onNodeScriptChange();
         } else {
-            sel.innerHTML = `<option value="${WF.action.script_id || ''}">${WF.action.script_name || 'Error loading'}</option>`;
+            sel.innerHTML = `<option value="">Error loading Apps Script list</option>`;
         }
     } catch {
-        sel.innerHTML = `<option value="${WF.action.script_id || ''}">Connect Google to load</option>`;
+        sel.innerHTML = `<option value="">Connect Google in settings first</option>`;
     }
 }
 
-async function onScriptChange() {
-    const scriptId = document.getElementById('editScript').value;
-    const fnSel    = document.getElementById('editFunction');
+async function onNodeScriptChange() {
+    const scriptId = document.getElementById('nodeScript').value;
+    const fnSel    = document.getElementById('nodeFunction');
+    const activeNode = WF.nodes[activeConfigNodeId];
+    const savedFn = activeNode ? activeNode.config.function_name : '';
+    
     if (!scriptId) { fnSel.innerHTML = '<option value="">Select script first…</option>'; return; }
-    fnSel.innerHTML = '<option value="">Loading…</option>';
+    fnSel.innerHTML = '<option value="">Loading functions…</option>';
     try {
         const r = await api.get(`/api/scripts/${scriptId}/functions`);
         fnSel.innerHTML = (r.success && r.functions.length)
             ? r.functions.map(f =>
-                `<option value="${f.name}" ${f.name === WF.action.function_name ? 'selected' : ''}>${f.name} (${f.file}.gs)</option>`
+                `<option value="${f.name}" ${f.name === savedFn ? 'selected' : ''}>${f.name} (${f.file}.gs)</option>`
               ).join('')
             : '<option value="">No functions found</option>';
     } catch {
-        fnSel.innerHTML = `<option value="${WF.action.function_name || ''}">Error loading</option>`;
+        fnSel.innerHTML = `<option value="">Error loading functions</option>`;
     }
 }
 
-function toggleEditAction() {
-    const isApi = document.getElementById('editActionApi').checked;
-    document.getElementById('editApiFields').style.display = isApi ? '' : 'none';
-    document.getElementById('editWebFields').style.display = isApi ? 'none' : '';
-}
-
-// ── Filter node ───────────────────────────────────────────────────────────────
-
-function initFilter() {
-    const cfg = WF.filter || {};
-    document.getElementById('filterEnabled').checked = !!cfg.enabled;
-    document.getElementById('filterLogic').value = cfg.logic || 'AND';
-    (cfg.conditions || []).forEach(c => addCondition(c));
-    updateFilterSummary();
-    if (cfg.enabled) {
-        document.getElementById('filterBody').style.display = '';
-        document.getElementById('filterChevron').style.transform = 'rotate(180deg)';
-    }
-}
-
-function toggleFilterBody() {
-    const body    = document.getElementById('filterBody');
-    const chevron = document.getElementById('filterChevron');
-    const open    = body.style.display !== 'none';
-    body.style.display    = open ? 'none' : '';
-    chevron.style.transform = open ? '' : 'rotate(180deg)';
-}
-
-function onFilterToggle() {
-    updateFilterSummary();
-    // Auto-open body when enabling
-    if (document.getElementById('filterEnabled').checked) {
-        document.getElementById('filterBody').style.display = '';
-        document.getElementById('filterChevron').style.transform = 'rotate(180deg)';
-    }
-}
-
-function addCondition(data = {}) {
-    const tpl  = document.getElementById('conditionRowTpl');
-    const node = tpl.content.cloneNode(true);
-    if (data.field)    node.querySelector('.cond-field').value = data.field;
-    if (data.operator) node.querySelector('.cond-op').value   = data.operator;
-    if (data.value !== undefined) node.querySelector('.cond-val').value = data.value;
-
-    // Hide value input for exists/not_exists operators
-    const opSel = node.querySelector('.cond-op');
-    const valIn = node.querySelector('.cond-val');
-    opSel.addEventListener('change', () => {
-        valIn.style.display = ['exists','not_exists'].includes(opSel.value) ? 'none' : '';
-    });
-    if (['exists','not_exists'].includes(data.operator)) valIn.style.display = 'none';
-
-    opSel.addEventListener('change', updateFilterSummary);
-    node.querySelector('.cond-field').addEventListener('input', updateFilterSummary);
-    node.querySelector('.cond-val').addEventListener('input', updateFilterSummary);
-
-    document.getElementById('filterConditions').appendChild(node);
-    updateFilterSummary();
-}
-
-function updateFilterSummary() {
-    const enabled = document.getElementById('filterEnabled').checked;
-    const logic   = document.getElementById('filterLogic').value;
-    const rows    = document.querySelectorAll('#filterConditions .condition-row');
-    let   text    = 'Disabled — all events pass through';
-    if (enabled) {
-        if (!rows.length) {
-            text = 'Enabled — no conditions set (all pass)';
-        } else {
-            const parts = [...rows].map(r => {
-                const f = r.querySelector('.cond-field').value || '…';
-                const o = r.querySelector('.cond-op').value;
-                const v = r.querySelector('.cond-val').value;
-                return ['exists','not_exists'].includes(o) ? `${f} ${o}` : `${f} ${o} ${v || '…'}`;
-            });
-            text = parts.join(` ${logic} `);
-        }
-    }
-    document.getElementById('filterSummary').textContent = text;
-}
-
-function getFilterConfig() {
-    const enabled = document.getElementById('filterEnabled').checked;
-    const logic   = document.getElementById('filterLogic').value;
-    const rows    = document.querySelectorAll('#filterConditions .condition-row');
-    const conditions = [...rows].map(r => ({
-        field:    r.querySelector('.cond-field').value.trim(),
-        operator: r.querySelector('.cond-op').value,
-        value:    r.querySelector('.cond-val').value,
-    })).filter(c => c.field);
-    return { enabled, logic, conditions };
-}
-
-// ── Parameter mapping ─────────────────────────────────────────────────────────
-
-let lastFocusedParamInput = null;
-
-// Track which param-value input the user last clicked/focused
-document.addEventListener('focusin', e => {
-    if (e.target.classList.contains('param-value')) lastFocusedParamInput = e.target;
-});
-
-function initParams() {
-    (WF.action.parameters || []).forEach(p => addParam(p));
-}
-
-function addParam(data = {}) {
-    const tpl  = document.getElementById('paramRowTpl');
-    const node = tpl.content.cloneNode(true);
-    if (data.name)  node.querySelector('.param-name').value  = data.name;
-    if (data.value !== undefined) node.querySelector('.param-value').value = data.value;
-
-    // Make value input a drop target
-    const valueInput = node.querySelector('.param-value');
-    valueInput.addEventListener('dragover', e => {
-        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
-        valueInput.classList.add('drop-over');
-    });
-    valueInput.addEventListener('dragleave', () => valueInput.classList.remove('drop-over'));
-    valueInput.addEventListener('drop', e => {
-        e.preventDefault();
-        valueInput.classList.remove('drop-over');
-        insertAtCursor(valueInput, e.dataTransfer.getData('text/plain'));
-    });
-
-    document.getElementById('paramRows').appendChild(node);
-}
-
-function getParams() {
-    return [...document.querySelectorAll('#paramRows .param-row')].map(r => ({
-        name:  r.querySelector('.param-name').value.trim(),
-        value: r.querySelector('.param-value').value,
-    })).filter(p => p.name);
-}
-
-// ── Drop zone (creates a new param row) ──────────────────────────────────────
-
-function onDropZoneDragOver(e) {
-    e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
-    document.getElementById('paramDropZone').classList.add('drag-over');
-}
-function onDropZoneDragLeave() {
-    document.getElementById('paramDropZone').classList.remove('drag-over');
-}
-function onDropZoneDrop(e) {
-    e.preventDefault();
-    document.getElementById('paramDropZone').classList.remove('drag-over');
-    const expr = e.dataTransfer.getData('text/plain');
-    // Derive a param name from the path e.g. payload.foo.bar → bar
-    const match = expr.match(/\{\{payload\.(?:.*\.)?([^}]+)\}\}/);
-    const name  = match ? match[1] : 'param';
-    addParam({ name, value: expr });
-}
-
-// ── Pinned Trigger Data ───────────────────────────────────────────────────────
-
-let pinnedPayload = null;
-
-function pinCurrentPayload() {
-    try {
-        const raw = document.getElementById('testPayload').value;
-        pinPayload(JSON.parse(raw));
-    } catch {}
-}
-
-function pinPayload(payloadObj) {
-    pinnedPayload = payloadObj;
-    renderPinnedFields();
-    document.getElementById('pinnedDataPanel').style.display = '';
-}
-
-function clearPinnedData() {
-    pinnedPayload = null;
-    document.getElementById('pinnedDataPanel').style.display = 'none';
-}
-
-function renderPinnedFields() {
-    const fields = flattenObject(pinnedPayload, 'payload');
-    document.getElementById('pinnedFieldCount').textContent = `· ${fields.length} fields`;
-    document.getElementById('pinnedFields').innerHTML = fields.map(f => `
-        <div class="data-pill" draggable="true"
-             data-path="${escapeHtml(f.path)}"
-             ondragstart="onPillDragStart(event,this)"
-             onclick="onPillClick(this)"
-             title="${escapeHtml(f.path)} = ${escapeHtml(String(f.value))}">
-            <span class="data-pill-path">${escapeHtml(f.path)}</span>
-            <span class="data-pill-sep">·</span>
-            <span class="data-pill-value">${escapeHtml(truncateStr(String(f.value ?? ''), 18))}</span>
-        </div>`).join('');
-}
-
-function flattenObject(obj, prefix) {
-    const out = [];
-    for (const [k, v] of Object.entries(obj || {})) {
-        const path = `${prefix}.${k}`;
-        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-            out.push(...flattenObject(v, path));
-        } else {
-            out.push({ path, value: Array.isArray(v) ? JSON.stringify(v) : v });
-        }
-    }
-    return out;
-}
-
-function truncateStr(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
-
-function onPillDragStart(e, el) {
-    const expr = '{' + '{' + el.dataset.path + '}' + '}';
-    e.dataTransfer.setData('text/plain', expr);
-    e.dataTransfer.effectAllowed = 'copy';
-}
-
-function onPillClick(pill) {
-    const expr = '{' + '{' + pill.dataset.path + '}' + '}';
-    if (lastFocusedParamInput && document.getElementById('paramRows').contains(lastFocusedParamInput)) {
-        insertAtCursor(lastFocusedParamInput, expr);
-    } else {
-        const match = pill.dataset.path.match(/\.([^.]+)$/);
-        addParam({ name: match ? match[1] : 'param', value: expr });
-        showToast('Added parameter from ' + pill.dataset.path);
-    }
-}
-
-function insertAtCursor(input, text) {
-    const s = input.selectionStart ?? input.value.length;
-    const e = input.selectionEnd   ?? input.value.length;
-    input.value = input.value.slice(0, s) + text + input.value.slice(e);
-    input.selectionStart = input.selectionEnd = s + text.length;
-    input.focus();
-}
-
-// ── Shared row removal ────────────────────────────────────────────────────────
-
-function removeRow(btn) {
-    btn.closest('.condition-row, .param-row').remove();
-    updateFilterSummary();
-}
-
-// ── Save ──────────────────────────────────────────────────────────────────────
-
-async function saveAll() {
-    const credSel   = document.getElementById('editCredential');
-    const scriptSel = document.getElementById('editScript');
-    const data = {
-        name:        document.getElementById('editName').value,
-        description: document.getElementById('editDesc').value,
-        trigger: {
-            source_app:    credSel.options[credSel.selectedIndex]?.dataset?.app || 'custom',
-            credential_id: credSel.value,
-            event_type:    document.getElementById('editEventType').value,
-        },
-        filter: getFilterConfig(),
-        action: {
-            type:          document.querySelector('input[name="editActionType"]:checked').value,
-            script_id:     document.getElementById('editScript').value,
-            script_name:   scriptSel.options[scriptSel.selectedIndex]?.textContent || '',
-            function_name: document.getElementById('editFunction').value,
-            web_app_url:   document.getElementById('editWebUrl')?.value || '',
-            parameters:    getParams(),
-        },
-    };
-    try {
-        const btn = document.getElementById('saveBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        await api.put(`/api/workflows/${WF.id}`, data);
-        showToast('Workflow saved');
-    } catch (e) { showToast(e.message, 'error'); }
-    finally {
-        const btn = document.getElementById('saveBtn');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-lg"></i> Save';
-    }
-}
-
-// ── Status / Delete ───────────────────────────────────────────────────────────
-
-async function toggleStatus() {
-    await api.post(`/api/workflows/${WF.id}/toggle`);
-    location.reload();
-}
-
-async function deleteWorkflow() {
-    confirmDelete(`Delete workflow "${WF.name}"?`, async () => {
-        await api.delete(`/api/workflows/${WF.id}`);
-        showToast('Deleted');
-        window.location = `/workspaces/${WF.workspace_id}/projects/${WF.project_id}`;
-    });
-}
-
-function copyText(id) {
-    const el = document.getElementById(id);
-    navigator.clipboard.writeText(el.textContent || el.value);
-    showToast('Copied');
-}
-
-// ── Test ──────────────────────────────────────────────────────────────────────
-
-async function runTest() {
-    const btn = document.getElementById('testBtn');
-    try {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        const payload = JSON.parse(document.getElementById('testPayload').value);
-        let resp;
-        const src = WF.trigger.source_app;
-        if (src === 'telegram') {
-            resp = await fetch(`/webhook/telegram/${WF.trigger.credential_id}`, {
-                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
-            });
-        } else if (src === 'servicenow') {
-            resp = await fetch(`/webhook/servicenow/${WF.trigger.credential_id}`, {
-                method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
-            });
-        } else {
-            const cred = await api.get(`/api/credentials/${WF.trigger.credential_id}`);
-            resp = await fetch('/webhook/trigger', {
-                method: 'POST',
-                headers: {'Content-Type':'application/json', 'X-API-Key': cred.api_key, 'X-Event-Type': WF.trigger.event_type},
-                body: JSON.stringify(payload)
-            });
-        }
-        const result = await resp.json();
-        document.getElementById('testResult').style.display = '';
-        const el = document.getElementById('testResultBody');
-        const ok      = result.processed > 0;
-        const skipped = result.skipped > 0 && result.processed === 0;
-        el.style.color = ok ? '#7ee787' : skipped ? '#facc15' : '#f87171';
-        el.textContent = JSON.stringify(result, null, 2);
-        // Auto-pin the sent payload so fields are immediately draggable
-        try { pinPayload(JSON.parse(document.getElementById('testPayload').value)); } catch {}
-
-    } catch (e) { showToast('Error: ' + e.message, 'error'); }
-    finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Send';
-    }
-}
-
-// ── Recent Events ─────────────────────────────────────────────────────────────
-
-async function loadRecentEvents() {
-    const events = await api.get(`/api/events?workflow_id=${WF.id}&limit=5`);
-    const el = document.getElementById('recentEvents');
-    if (!events.length) {
-        el.innerHTML = '<p class="text-center py-2" style="font-size:11px;color:var(--text-3);margin:0">No events yet. Send a test payload above.</p>';
-        return;
-    }
-    el.innerHTML = events.map(e => `
-        <div class="event-mini">
-            <span class="status-dot ${e.status}"></span>
-            <span class="event-mini-type">${escapeHtml(e.event_type || 'unknown')}</span>
-            <span class="event-mini-time">${timeAgo(e.timestamp)}</span>
-        </div>`).join('');
-}
-
-// ── Inline Credential ─────────────────────────────────────────────────────────
+// ── Inline Credential panel inside Modal ───────────────────────────────────────
 
 function toggleNewCredential() {
     const p = document.getElementById('inlineCredPanel');
@@ -809,6 +1341,7 @@ function selectCredType(type) {
         b.classList.toggle('btn-outline-secondary', b.dataset.type !== type);
     });
     const schema = SCHEMAS[type];
+    if (!schema) return;
     document.getElementById('newCredFields').innerHTML = schema.fields.map(f => `
         <div class="mb-2">
             <label class="form-label">${f.label}${f.required ? ' <span style="color:var(--danger)">*</span>' : ''}</label>
@@ -826,15 +1359,210 @@ async function saveInlineCredential() {
         const cred = await api.post('/api/credentials', {
             name, workspace_id: WORKSPACE_ID, app_type: selectedCredType, config
         });
-        showToast('Credential created');
+        showToast('Credential created successfully');
         toggleNewCredential();
-        const sel = document.getElementById('editCredential');
+        
+        // Append credential options to select menus
+        const sel = document.getElementById('nodeCred');
         const opt = new Option(`${cred.name} (${cred.app_type})`, cred.id);
         opt.dataset.app = cred.app_type;
         sel.appendChild(opt);
+        
+        if (cred.app_type === 'gemini' || cred.app_type === 'openai') {
+            const aiSel = document.getElementById('nodeAiCred');
+            const aiOpt = new Option(`${cred.name} (${cred.app_type})`, cred.id);
+            aiSel.appendChild(aiOpt);
+        }
+        
         sel.value = cred.id;
-        onCredentialChange();
+        onNodeCredChange();
     } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── Parameter & Filter row helpers ────────────────────────────────────────────
+
+function addNodeParam(data = {}, listId = 'nodeParamRows') {
+    const tpl = document.getElementById('nodeParamRowTpl');
+    const node = tpl.content.cloneNode(true);
+    if (data.name) node.querySelector('.param-name').value = data.name;
+    if (data.value !== undefined) node.querySelector('.param-value').value = data.value;
+    
+    // Attach drop handlers for drag/drop variable mappings
+    const valIn = node.querySelector('.param-value');
+    valIn.addEventListener('dragover', e => {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+        valIn.classList.add('drop-over');
+    });
+    valIn.addEventListener('dragleave', () => valIn.classList.remove('drop-over'));
+    valIn.addEventListener('drop', e => {
+        e.preventDefault();
+        valIn.classList.remove('drop-over');
+        insertTextAtCursor(valIn, e.dataTransfer.getData('text/plain'));
+    });
+    
+    document.getElementById(listId).appendChild(node);
+}
+
+function getModalParams(listId) {
+    return [...document.querySelectorAll(`#${listId} .param-row`)].map(r => ({
+        name: r.querySelector('.param-name').value.trim(),
+        value: r.querySelector('.param-value').value
+    })).filter(p => p.name);
+}
+
+function addNodeCondition(data = {}) {
+    const tpl = document.getElementById('nodeConditionRowTpl');
+    const node = tpl.content.cloneNode(true);
+    if (data.field) node.querySelector('.cond-field').value = data.field;
+    if (data.operator) node.querySelector('.cond-op').value = data.operator;
+    if (data.value !== undefined) node.querySelector('.cond-val').value = data.value;
+    
+    const opSel = node.querySelector('.cond-op');
+    const valIn = node.querySelector('.cond-val');
+    opSel.addEventListener('change', () => {
+        valIn.style.display = ['exists', 'not_exists'].includes(opSel.value) ? 'none' : '';
+    });
+    if (['exists', 'not_exists'].includes(data.operator)) valIn.style.display = 'none';
+    
+    document.getElementById('nodeFilterConditions').appendChild(node);
+}
+
+function getModalFilterConditions() {
+    return [...document.querySelectorAll('#nodeFilterConditions .condition-row')].map(r => ({
+        field: r.querySelector('.cond-field').value.trim(),
+        operator: r.querySelector('.cond-op').value,
+        value: r.querySelector('.cond-val').value
+    })).filter(c => c.field);
+}
+
+function addNodeHttpHeader(data = {}) {
+    const tpl = document.getElementById('nodeHttpHeaderRowTpl');
+    const node = tpl.content.cloneNode(true);
+    if (data.name) node.querySelector('.header-name').value = data.name;
+    if (data.value !== undefined) node.querySelector('.header-value').value = data.value;
+    document.getElementById('nodeHttpHeaderRows').appendChild(node);
+}
+
+function getModalHttpHeaders() {
+    return [...document.querySelectorAll('#nodeHttpHeaderRows .header-row')].map(r => ({
+        name: r.querySelector('.header-name').value.trim(),
+        value: r.querySelector('.header-value').value
+    })).filter(h => h.name);
+}
+
+function toggleHttpMethodBody() {
+    const method = document.getElementById('nodeHttpMethod').value;
+    const bodySec = document.getElementById('nodeHttpBodySection');
+    bodySec.style.display = ['GET', 'DELETE'].includes(method) ? 'none' : 'block';
+}
+
+function removeNodeRow(btn) {
+    btn.closest('.condition-row, .param-row, .header-row').remove();
+}
+
+// ── General Save & Helper routines ────────────────────────────────────────────
+
+async function saveAllQuietly() {
+    const data = {
+        name: document.getElementById('editName').value,
+        description: document.getElementById('editDesc').value,
+        nodes: WF.nodes
+    };
+    try {
+        await api.put(`/api/workflows/${WF.id}`, data);
+    } catch (e) { console.error("Silent save failed", e); }
+}
+
+async function saveAll() {
+    const data = {
+        name: document.getElementById('editName').value,
+        description: document.getElementById('editDesc').value,
+        nodes: WF.nodes
+    };
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    try {
+        const res = await api.put(`/api/workflows/${WF.id}`, data);
+        showToast('Workflow saved successfully', 'success');
+        document.getElementById('breadcrumbWfName').textContent = data.name;
+    } catch (e) {
+        showToast(e.message || 'Error saving workflow', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Save';
+    }
+}
+
+async function toggleStatus() {
+    await api.post(`/api/workflows/${WF.id}/toggle`);
+    const statusBadge = document.getElementById('statusBadge');
+    const isAct = statusBadge.classList.contains('active');
+    statusBadge.className = `status-badge ${isAct ? 'inactive' : 'active'}`;
+    statusBadge.textContent = isAct ? 'inactive' : 'active';
+    showToast(`Workflow is now ${isAct ? 'inactive' : 'active'}`);
+}
+
+async function deleteWorkflow() {
+    confirmDelete(`Delete workflow "${WF.name}"?`, async () => {
+        await api.delete(`/api/workflows/${WF.id}`);
+        showToast('Workflow deleted');
+        window.location = `/workspaces/${WF.workspace_id}/projects/${WF.project_id}`;
+    });
+}
+
+function toggleMaximize() {
+    const card = document.getElementById('canvasCard');
+    const isMax = card.classList.toggle('maximized-canvas');
+    const btn = document.getElementById('maximizeBtn');
+    if (isMax) {
+        btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i> Minimize';
+        btn.classList.replace('btn-outline-secondary', 'btn-primary');
+    } else {
+        btn.innerHTML = '<i class="bi bi-arrows-fullscreen"></i> Maximize';
+        btn.classList.replace('btn-primary', 'btn-outline-secondary');
+    }
+    // Redraw SVG connectors matching the resized screen dimension
+    drawConnections();
+}
+
+function copyText(id) {
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.textContent || el.value);
+    showToast('Copied to clipboard');
+}
+
+function flattenObject(obj, prefix) {
+    const out = [];
+    for (const [k, v] of Object.entries(obj || {})) {
+        const path = `${prefix}.${k}`;
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+            out.push(...flattenObject(v, path));
+        } else {
+            out.push({ path, value: Array.isArray(v) ? JSON.stringify(v) : v });
+        }
+    }
+    return out;
+}
+
+function escapeHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function truncateStr(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+function insertTextAtCursor(input, text) {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.selectionStart = input.selectionEnd = start + text.length;
+    input.focus();
 }
 </script>
 {% endblock %}

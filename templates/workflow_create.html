@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}New Workflow — AppScript Bridge{% endblock %}
+{% block title %}New Workflow — Appscript EventBridge by Astreya{% endblock %}
 
 {% block breadcrumb %}
 <nav aria-label="breadcrumb" class="breadcrumb">
@@ -44,7 +44,7 @@
                         <div class="d-flex gap-2">
                             <select class="form-select" id="wfCredential" onchange="onCredentialChange()" style="flex:1">
                                 <option value="">Select a credential…</option>
-                                {% for cred in credentials %}
+                                {% for cred in credentials if cred.app_type not in ['gemini', 'openai'] %}
                                 <option value="{{ cred.id }}" data-app="{{ cred.app_type }}">
                                     {{ cred.name }} ({{ cred.app_type }})
                                 </option>
@@ -154,73 +154,6 @@
         </div>
 
     </div><!-- /flow-column -->
-
-    <!-- Right: Guide panel -->
-    <div class="context-panel">
-        <div class="content-card">
-            <div class="card-header-custom">
-                <h6><i class="bi bi-info-circle me-1" style="color:var(--accent-light)"></i>How to Build</h6>
-            </div>
-            <div class="card-body-custom">
-                <div class="setup-steps">
-                    <div class="setup-step">
-                        <span class="step-number">1</span>
-                        <div>
-                            <strong>Choose a Trigger</strong>
-                            <p>Select or create a credential for ServiceNow, Telegram, or a custom app. Choose which event to listen for.</p>
-                        </div>
-                    </div>
-                    <div class="setup-step">
-                        <span class="step-number">2</span>
-                        <div>
-                            <strong>Set the Action</strong>
-                            <p>Pick the Apps Script project and function to run. Functions auto-load from your connected Google account.</p>
-                        </div>
-                    </div>
-                    <div class="setup-step">
-                        <span class="step-number">3</span>
-                        <div>
-                            <strong>Activate &amp; Test</strong>
-                            <p>After creating, use the Test panel in the editor to send a sample payload and validate the end-to-end flow.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="content-card">
-            <div class="card-header-custom"><h6>Supported Sources</h6></div>
-            <div class="card-body-custom" style="display:flex;flex-direction:column;gap:10px">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="platform-icon-sm" style="background:rgba(129,181,161,.12);color:#81b5a1">
-                        <i class="bi bi-gear-wide-connected"></i>
-                    </div>
-                    <div>
-                        <div style="font-size:12px;font-weight:600;color:var(--text-1)">ServiceNow</div>
-                        <div style="font-size:11px;color:var(--text-3)">Incidents, Changes, Problems</div>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="platform-icon-sm" style="background:rgba(0,136,204,.12);color:#0088cc">
-                        <i class="bi bi-telegram"></i>
-                    </div>
-                    <div>
-                        <div style="font-size:12px;font-weight:600;color:var(--text-1)">Telegram</div>
-                        <div style="font-size:11px;color:var(--text-3)">Messages, Commands, Callbacks</div>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="platform-icon-sm" style="background:var(--accent-dim);color:var(--accent-light)">
-                        <i class="bi bi-plug-fill"></i>
-                    </div>
-                    <div>
-                        <div style="font-size:12px;font-weight:600;color:var(--text-1)">Custom / Generic</div>
-                        <div style="font-size:11px;color:var(--text-3)">Any webhook-capable service</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 

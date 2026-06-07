@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app, session
+from flask import Blueprint, render_template, current_app, session, redirect
 from services.storage import APP_CREDENTIAL_SCHEMAS
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -7,6 +7,35 @@ dashboard_bp = Blueprint("dashboard", __name__)
 def _ctx(**extra):
     storage = current_app.config["STORAGE"]
     tokens = storage.get_google_tokens()
+    
+    # Build workspaces hierarchy for sidebar navigation
+    nav_workspaces = []
+    try:
+        workspaces_list = storage.get_workspaces()
+        projects_list = storage.get_projects()
+        workflows_list = storage.get_workflows()
+        
+        for ws in workspaces_list:
+            ws_id = ws["id"]
+            ws_projects = [p for p in projects_list if p.get("workspace_id") == ws_id]
+            ws_proj_nodes = []
+            for prj in ws_projects:
+                prj_id = prj["id"]
+                prj_workflows = [w for w in workflows_list if w.get("project_id") == prj_id]
+                ws_proj_nodes.append({
+                    "id": prj_id,
+                    "name": prj["name"],
+                    "workflows": [{"id": w["id"], "name": w["name"]} for w in prj_workflows]
+                })
+            nav_workspaces.append({
+                "id": ws_id,
+                "name": ws["name"],
+                "projects": ws_proj_nodes
+            })
+    except Exception as e:
+        current_app.logger.error(f"Error building sidebar navigation: {str(e)}")
+        nav_workspaces = []
+
     base = {
         "google_connected": bool(tokens and tokens.get("access_token")),
         "user_email": session.get("user_email", ""),
@@ -14,6 +43,9 @@ def _ctx(**extra):
         "user_picture": session.get("user_picture", ""),
         "base_url": current_app.config["BASE_URL"],
         "app_schemas": APP_CREDENTIAL_SCHEMAS,
+        "gcp_project_name": current_app.config.get("GCP_PROJECT_NAME", ""),
+        "gcp_project_number": current_app.config.get("GCP_PROJECT_NUMBER", ""),
+        "nav_workspaces": nav_workspaces,
     }
     base.update(extra)
     return base
@@ -47,12 +79,14 @@ def project_detail(workspace_id, project_id):
 @dashboard_bp.route("/workspaces/<workspace_id>/projects/<project_id>/workflows/new")
 def workflow_create(workspace_id, project_id):
     storage = current_app.config["STORAGE"]
-    ws = storage.get_workspace(workspace_id)
-    proj = storage.get_project(project_id)
-    creds = storage.get_credentials(workspace_id)
-    return render_template("workflow_create.html", **_ctx(
-        page="workspaces", workspace=ws, project=proj, credentials=creds,
-    ))
+    wf_data = {
+        "project_id": project_id,
+        "workspace_id": workspace_id,
+        "name": "Untitled Workflow",
+        "description": "",
+    }
+    wf = storage.create_workflow(wf_data)
+    return redirect(f"/workflows/{wf['id']}/edit")
 
 
 @dashboard_bp.route("/workflows/<workflow_id>/edit")
@@ -84,6 +118,40 @@ def workflow_edit(workflow_id):
                 "date": 1234567890,
                 "text": "/start Hello from AppScript Bridge"
             }
+        }, indent=2),
+        "google_chat": json.dumps({
+            "type": "MESSAGE",
+            "message": {
+                "text": "Hello bot from space",
+                "sender": {"displayName": "User", "email": "user@example.com"}
+            },
+            "space": {"name": "spaces/AAAAbbbb", "type": "ROOM"}
+        }, indent=2),
+        "gmail": json.dumps({
+            "message": {
+                "data": "eyJlbWFpbEFkZHJlc3MiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaGlzdG9yeUlkIjoiMTIzNDU2In0=",
+                "messageId": "msg_12345"
+            }
+        }, indent=2),
+        "google_drive": json.dumps({
+            "resource_state": "update",
+            "resource_id": "file_12345",
+            "file_name": "Monthly Report.docx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "owner": "user@example.com"
+        }, indent=2),
+        "google_sheets": json.dumps({
+            "event": "row.added",
+            "spreadsheet_id": "sheet_123456",
+            "range": "Sheet1!A5:E5",
+            "values": ["2026-06-07", "Apples", "10", "Pending"]
+        }, indent=2),
+        "google_calendar": json.dumps({
+            "resource_state": "exists",
+            "event_id": "event_789abc",
+            "summary": "Sync meeting",
+            "start": "2026-06-07T17:00:00Z",
+            "end": "2026-06-07T18:00:00Z"
         }, indent=2),
         "custom": json.dumps({"test": True, "message": "Hello from AppScript Bridge"}, indent=2),
     }

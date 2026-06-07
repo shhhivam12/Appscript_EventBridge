@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Event Logs — AppScript Bridge{% endblock %}
+{% block title %}Event Logs — Appscript EventBridge by Astreya{% endblock %}
 {% block breadcrumb %}
 <nav class="breadcrumb">
     <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
@@ -37,6 +37,9 @@
         <button class="filter-tab" onclick="filterEvents('skipped', this)">
             <i class="bi bi-skip-forward me-1" style="color:var(--warning)"></i>Skipped
         </button>
+        <button class="filter-tab" onclick="filterEvents('pending_human', this)">
+            <i class="bi bi-person-check-fill me-1" style="color:var(--warning)"></i>Pending Approval
+        </button>
     </div>
     <span id="eventCount" style="font-size:11px;color:var(--text-3)"></span>
 </div>
@@ -46,12 +49,12 @@
     <div class="table-responsive">
         <table class="table table-hover mb-0" style="table-layout:fixed;width:100%">
             <colgroup>
-                <col style="width:90px">   <!-- Status   -->
-                <col style="width:100px">  <!-- Source   -->
-                <col style="width:160px">  <!-- Event    -->
+                <col style="width:145px">  <!-- Status   -->
+                <col style="width:95px">   <!-- Source   -->
+                <col style="width:155px">  <!-- Event    -->
                 <col>                      <!-- Workflow (flex) -->
-                <col style="width:80px">   <!-- Duration -->
-                <col style="width:120px">  <!-- Time     -->
+                <col style="width:85px">   <!-- Duration -->
+                <col style="width:115px">  <!-- Time     -->
                 <col style="width:40px">   <!-- Eye      -->
             </colgroup>
             <thead>
@@ -122,6 +125,23 @@
                     </div>
                     <div class="alert alert-danger mb-0" id="detailErrorMsg"
                          style="font-size:11.5px;white-space:pre-wrap"></div>
+                </div>
+
+                <!-- Human Approval Panel -->
+                <div id="detailApprovalGate" style="display:none" class="mb-3 border p-3 rounded" style="border-color:var(--warning)">
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--warning);margin-bottom:5px">
+                        <i class="bi bi-person-check-fill me-1"></i>Pending Human Approval Gate
+                    </div>
+                    <div id="detailApprovalInstruction" class="p-2 border rounded mb-2" style="font-size:12px;background:rgba(255,255,255,0.01);border-color:var(--border)"></div>
+                    <div class="d-flex gap-2 justify-content-end align-items-center flex-wrap">
+                        <input type="text" class="form-control form-control-sm" id="detailApprovalComment" placeholder="Optional comments..." style="max-width:200px">
+                        <button class="btn btn-outline-danger btn-sm" onclick="respondToDetailApproval(false)">
+                            <i class="bi bi-x-lg"></i> Reject
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="respondToDetailApproval(true)">
+                            <i class="bi bi-check-lg"></i> Approve
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Payload + Response side by side on wide screens -->
@@ -217,7 +237,7 @@ function renderEvents(events) {
                 : 'var(--text-3)';
 
         return `<tr style="cursor:pointer" onclick="showEventDetail(${i})">
-            <td><span class="status-badge ${e.status}">${e.status}</span></td>
+            <td><span class="status-badge ${e.status}">${e.status.replace('_', ' ')}</span></td>
             <td>
                 <span class="badge bg-secondary-subtle text-secondary"
                       style="font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block">
@@ -244,12 +264,15 @@ function renderEvents(events) {
     }).join('');
 }
 
+let currentDetailEventId = null;
+
 function showEventDetail(i) {
     const e  = allEvents[i];
     const ts = e.timestamp ? new Date(e.timestamp) : null;
+    currentDetailEventId = e.id;
 
     document.getElementById('detailStatus').innerHTML =
-        `<span class="status-badge ${e.status}">${e.status}</span>`;
+        `<span class="status-badge ${e.status}">${e.status.replace('_', ' ')}</span>`;
     document.getElementById('detailSource').textContent   = e.source_app || '—';
     document.getElementById('detailDuration').textContent =
         e.processing_time_ms != null ? `${e.processing_time_ms}ms` : '—';
@@ -276,12 +299,44 @@ function showEventDetail(i) {
         errDiv.style.display = 'none';
     }
 
+    // Approval gate
+    const appDiv = document.getElementById('detailApprovalGate');
+    if (e.status === 'pending_human') {
+        appDiv.style.display = '';
+        const info = e.human_step_info || {};
+        document.getElementById('detailApprovalInstruction').textContent = info.instruction || 'Please review and approve.';
+        document.getElementById('detailApprovalComment').value = '';
+    } else {
+        appDiv.style.display = 'none';
+    }
+
     document.getElementById('detailPayload').textContent =
         JSON.stringify(e.payload  || {}, null, 2);
     document.getElementById('detailResponse').textContent =
         JSON.stringify(e.response || {}, null, 2);
 
     new bootstrap.Modal(document.getElementById('eventDetailModal')).show();
+}
+
+async function respondToDetailApproval(approved) {
+    const comments = document.getElementById('detailApprovalComment').value.trim();
+    try {
+        const res = await api.post(`/api/events/${currentDetailEventId}/resume`, { approved, comments });
+        if (res.success) {
+            showToast(approved ? 'Workflow approved and resumed' : 'Workflow rejected');
+            
+            // Hide detail modal
+            const modalEl = document.getElementById('eventDetailModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            
+            loadEvents();
+        } else {
+            showToast('Failed to resume: ' + res.error, 'error');
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
 }
 </script>
 {% endblock %}

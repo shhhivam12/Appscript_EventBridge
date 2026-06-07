@@ -81,6 +81,33 @@ def servicenow_webhook(credential_id):
     status_code = 200 if result.get("processed", 0) > 0 else 202
     return jsonify(result), status_code
 
+# ── Google Workspace webhook ──────────────────────────────────────────────────
+
+@webhook_bp.route("/google/<app_type>/<credential_id>", methods=["POST"])
+def google_workspace_webhook(app_type, credential_id):
+    credential, err = _processor().validate_credential(credential_id)
+    if err:
+        return jsonify({"error": err}), 404
+
+    if credential.get("app_type") != app_type:
+        return jsonify({"error": f"Not a {app_type} credential"}), 400
+
+    payload = dict(request.json or {})
+
+    # Check headers for Google push notifications details (state, resource, etc.)
+    resource_state = request.headers.get("X-Goog-Resource-State")
+    if resource_state:
+        payload["resource_state"] = resource_state
+        payload["resource_id"] = request.headers.get("X-Goog-Resource-ID")
+        payload["resource_uri"] = request.headers.get("X-Goog-Resource-URI")
+        payload["channel_id"] = request.headers.get("X-Goog-Channel-ID")
+
+    event_type, payload = _processor().parse_google_event(app_type, payload)
+    result = _processor().process_event(credential, event_type, payload)
+
+    status_code = 200 if result.get("processed", 0) > 0 else 202
+    return jsonify(result), status_code
+
 
 # ── Telegram: register webhook with Telegram API ─────────────────────────────
 
