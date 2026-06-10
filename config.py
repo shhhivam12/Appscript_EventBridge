@@ -10,7 +10,7 @@ class Config:
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/auth/callback")
-    GCP_PROJECT_NAME = os.getenv("GCP_PROJECT_NAME", "Appscript EventBridge Astreya")
+    GCP_PROJECT_NAME = os.getenv("GCP_PROJECT_NAME", "Apps Script EventBridge Astreya")
     GCP_PROJECT_NUMBER = GOOGLE_CLIENT_ID.split("-")[0] if "-" in GOOGLE_CLIENT_ID else ""
     SCOPES = [
         "https://www.googleapis.com/auth/script.projects",

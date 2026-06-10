@@ -195,7 +195,7 @@ def telegram_send_message(credential_id):
     bot_token = credential.get("config", {}).get("bot_token", "").strip()
     body      = request.json or {}
     chat_id   = body.get("chat_id")
-    text      = body.get("text", "Test message from AppScript Bridge 🚀")
+    text      = body.get("text", "Test message from Apps Script Bridge 🚀")
 
     if not chat_id:
         return jsonify({"error": "chat_id is required"}), 400
@@ -217,7 +217,7 @@ def telegram_send_message(credential_id):
 def test_webhook():
     return jsonify({
         "success": True,
-        "message": "AppScript Bridge webhook endpoint is reachable",
+        "message": "Apps Script Bridge webhook endpoint is reachable",
         "received": {
             "method":       request.method,
             "content_type": request.content_type,

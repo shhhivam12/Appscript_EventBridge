@@ -4,7 +4,7 @@
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Click the project dropdown at the top → **New Project**
-3. Enter a project name (e.g., `AppScript Event Bridge`)
+3. Enter a project name (e.g., `Apps Script Event Bridge`)
 4. Click **Create**
 5. Make sure your new project is selected in the dropdown
 
@@ -31,7 +31,7 @@
 1. Go to **APIs & Services** → **OAuth consent screen**
 2. Select **External** user type → Click **Create**
 3. Fill in:
-   - App name: `AppScript Event Bridge`
+   - App name: `Apps Script Event Bridge`
    - User support email: your email
    - Developer contact: your email
 4. Click **Save and Continue**
@@ -63,7 +63,7 @@
 1. Go to **APIs & Services** → **Credentials**
 2. Click **+ Create Credentials** → **OAuth client ID**
 3. Application type: **Web application**
-4. Name: `AppScript Event Bridge`
+4. Name: `Apps Script Event Bridge`
 5. Under **Authorized redirect URIs**, add:
    - `http://localhost:5000/auth/callback`  ← for local development
    - `https://<your-ngrok-subdomain>.ngrok-free.app/auth/callback`  ← if using ngrok (see Step 7)

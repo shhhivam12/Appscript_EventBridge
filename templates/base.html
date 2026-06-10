@@ -12,7 +12,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Appscript EventBridge by Astreya{% endblock %}</title>
+    <title>{% block title %}Apps Script EventBridge by Astreya{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -78,7 +78,7 @@
                                     <i class="bi bi-folder2-open text-warning me-1" style="font-size: 11px;"></i>
                                     <span><a href="/workspaces/{{ ws.id }}/projects/{{ prj.id }}" onclick="event.stopPropagation();">{{ prj.name }}</a></span>
                                 </div>
-                                <div class="tree-project-content" id="content-prj-{{ prj.id }}" style="padding-left: 10px; display: none;">
+                                <div class="tree-workspace-content" id="content-prj-{{ prj.id }}" style="padding-left: 10px; display: none;">
                                     {% for wf in prj.workflows %}
                                     <div class="tree-workflow-item py-1 {% if workflow and workflow.id == wf.id %}active{% endif %}">
                                         <a href="/workflows/{{ wf.id }}/edit" class="d-flex align-items-center gap-2">
@@ -105,11 +105,21 @@
             </div>
 
             <div class="nav-divider"></div>
-            <p class="nav-section-title">Settings</p>
+            <p class="nav-section-title">Settings & Guides</p>
             <ul class="nav-list">
                 <li class="nav-item">
                     <a href="/settings" class="nav-link {% if page == 'settings' %}active{% endif %}">
                         <i class="bi bi-gear-fill"></i><span>Settings</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/guide" class="nav-link {% if page == 'guide' %}active{% endif %}">
+                        <i class="bi bi-book-fill"></i><span>User Guide</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" id="startTourBtn" onclick="startInteractiveTour(event)">
+                        <i class="bi bi-compass-fill"></i><span>Interactive Tour</span>
                     </a>
                 </li>
             </ul>
@@ -192,6 +202,1010 @@
         </div>
     </div>
 </div>
+
+<!-- ── Interactive Onboarding Guide Modal ── -->
+<style>
+/* ── Interactive Tour Overlay Styles ── */
+body.tour-open {
+    overflow: hidden !important;
+}
+.tour-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 11, 26, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fade-in 0.25s ease-out;
+}
+[data-theme="light"] .tour-overlay {
+    background: rgba(244, 242, 249, 0.82);
+}
+.tour-card {
+    position: relative;
+    width: 820px;
+    max-width: 90%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: tour-scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tour-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-3);
+    font-size: 18px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+.tour-close-btn:hover {
+    color: var(--text-1);
+    background: rgba(255, 255, 255, 0.05);
+}
+[data-theme="light"] .tour-close-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+.tour-progress-bar-container {
+    width: 100%;
+    height: 5px;
+    background: var(--border);
+}
+.tour-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--orange) 100%);
+    width: 20%;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tour-content-wrapper {
+    display: flex;
+    min-height: 360px;
+}
+@media (max-width: 768px) {
+    .tour-content-wrapper {
+        flex-direction: column;
+    }
+    .tour-graphic-container {
+        width: 100% !important;
+        height: 180px;
+        border-right: none !important;
+        border-bottom: 1px solid var(--border);
+    }
+    .tour-text-container {
+        width: 100% !important;
+        padding: 24px !important;
+    }
+}
+.tour-graphic-container {
+    width: 42%;
+    background: rgba(0, 0, 0, 0.15);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    position: relative;
+    overflow: hidden;
+}
+[data-theme="light"] .tour-graphic-container {
+    background: rgba(108, 88, 175, 0.03);
+}
+.tour-graphic-step {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: fade-in-up 0.4s ease-out;
+}
+.tour-text-container {
+    width: 58%;
+    padding: 40px 45px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left;
+}
+.tour-step-info {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-light);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+}
+[data-theme="light"] .tour-step-info {
+    color: var(--accent);
+}
+.tour-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-1);
+    margin-bottom: 14px;
+    line-height: 1.35;
+}
+.tour-desc {
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.65;
+    margin-bottom: 0;
+}
+.tour-tip {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--accent-dim);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 20px;
+    animation: fade-in 0.4s ease;
+}
+.tour-tip i {
+    color: var(--accent-light);
+    font-size: 15px;
+    margin-top: 1px;
+}
+[data-theme="light"] .tour-tip i {
+    color: var(--accent);
+}
+.tour-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .tour-footer {
+    background: rgba(0, 0, 0, 0.01);
+}
+.tour-dots {
+    display: flex;
+    gap: 8px;
+}
+.tour-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-4);
+    opacity: 0.4;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+.tour-dot:hover {
+    opacity: 0.8;
+}
+.tour-dot.active {
+    background: var(--accent);
+    opacity: 1;
+    transform: scale(1.3);
+}
+[data-theme="light"] .tour-dot.active {
+    background: var(--accent-light);
+}
+.tour-nav-btns {
+    display: flex;
+    gap: 10px;
+}
+
+/* ── Graphic elements & Animations ── */
+.graphic-circle {
+    width: 105px;
+    height: 105px;
+    border-radius: 50%;
+    background: var(--gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+}
+.pulsing-glow {
+    box-shadow: 0 0 25px var(--accent-glow);
+    animation: tour-pulse-glow 2.5s infinite ease-in-out;
+}
+.graphic-icon-main {
+    font-size: 48px;
+    color: #fff;
+}
+.floating { animation: tour-float 3s infinite ease-in-out; }
+.floating-slow { animation: tour-float 4.5s infinite ease-in-out; }
+.floating-fast { animation: tour-float 2.2s infinite ease-in-out; }
+.floating-mid { animation: tour-float 3.5s infinite ease-in-out; }
+
+.graphic-mini-node {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-1);
+    font-size: 15px;
+    z-index: 3;
+    box-shadow: var(--shadow-sm);
+}
+.graphic-mini-node.n1 { top: 25px; left: 35px; }
+.graphic-mini-node.n2 { bottom: 25px; right: 35px; }
+.graphic-mini-node.n3 { top: 110px; right: 25px; }
+
+/* Mock Form & UI components for Tour */
+.mock-connector-panel {
+    width: 210px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+.mock-panel-header {
+    background: var(--bg-elevated);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10.5px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-1);
+}
+.mock-panel-body {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.mock-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+}
+.mock-label {
+    font-size: 8.5px;
+    color: var(--text-3);
+    font-weight: 600;
+}
+.mock-select, .mock-input {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    border-radius: var(--r-xs);
+    font-size: 9.5px;
+    color: var(--text-1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mock-input {
+    color: var(--text-4);
+    letter-spacing: 2px;
+    height: 24px;
+}
+.mock-webhook-result {
+    background: var(--success-dim);
+    border: 1px solid var(--success-border);
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    text-align: left;
+    margin-top: 6px;
+}
+.mock-webhook-title {
+    font-size: 9px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.mock-webhook-url {
+    font-size: 8px;
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+/* Mock Structural Hierarchy */
+.graphic-nested-structure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+.struct-card {
+    width: 155px;
+    padding: 9px 12px;
+    border-radius: var(--r-md);
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 600;
+    border: 1px solid;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.3s ease;
+}
+.struct-card.level-ws {
+    background: var(--accent-dim);
+    border-color: var(--border-accent);
+    color: var(--accent-light);
+}
+[data-theme="light"] .struct-card.level-ws {
+    color: var(--accent);
+}
+.struct-card.level-proj {
+    background: rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.25);
+    color: #f59e0b;
+}
+.struct-card.level-flow {
+    background: rgba(56,189,248,0.08);
+    border-color: rgba(56,189,248,0.25);
+    color: #38bdf8;
+}
+.struct-connector {
+    width: 2px;
+    height: 14px;
+    background: var(--border-strong);
+    transition: opacity 0.3s ease;
+}
+
+/* Mock Canvas */
+.mock-workflow-canvas {
+    position: relative;
+    width: 220px;
+    height: 120px;
+    background: radial-gradient(var(--border-strong) 1px, transparent 1px);
+    background-size: 10px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    overflow: hidden;
+}
+.mock-node {
+    width: 82px;
+    padding: 6px 8px;
+    border-radius: var(--r-md);
+    border: 1px solid;
+    font-size: 9.5px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    z-index: 2;
+    transition: box-shadow 0.25s ease, opacity 0.3s ease;
+}
+.mock-node.node-trig {
+    border-color: var(--trigger-border);
+    color: var(--trigger-color);
+}
+.mock-node.node-act {
+    border-color: var(--action-border);
+    color: var(--accent-light);
+}
+[data-theme="light"] .mock-node.node-act {
+    color: var(--accent);
+}
+.mock-node-header {
+    font-size: 7.5px;
+    text-transform: uppercase;
+    color: var(--text-3);
+    letter-spacing: 0.5px;
+}
+.mock-node-body {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Toggle strip */
+.mock-toggle-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+}
+.mock-header-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 210px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    padding: 6px 12px;
+    font-size: 9.5px;
+    font-weight: bold;
+}
+.mock-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mock-switch {
+    width: 26px;
+    height: 14px;
+    background: var(--text-4);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.mock-switch.active {
+    background: var(--success);
+}
+.mock-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+.mock-switch.active::after {
+    transform: translateX(12px);
+}
+.mock-test-sidebar {
+    width: 210px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    padding: 8px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    box-shadow: var(--shadow-sm);
+}
+.mock-test-title {
+    font-size: 9px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-1);
+}
+.mock-payload-box {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    padding: 4px 6px;
+    border-radius: var(--r-xs);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-3);
+    min-height: 34px;
+}
+
+/* Keyframes */
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes tour-scale-up {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes tour-float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+    100% { transform: translateY(0px); }
+}
+@keyframes tour-pulse-glow {
+    0% { box-shadow: 0 0 15px rgba(108,88,175,0.25); }
+    50% { box-shadow: 0 0 28px rgba(108,88,175,0.55); }
+    100% { box-shadow: 0 0 15px rgba(108,88,175,0.25); }
+}
+@keyframes tour-pulse-line {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+@keyframes tour-pulse-bg {
+    0% { background: rgba(253,90,68,0.06); }
+    50% { background: rgba(253,90,68,0.18); }
+    100% { background: rgba(253,90,68,0.06); }
+}
+@keyframes tour-pulse-arrow {
+    0% { transform: translateX(0px); opacity: 0.5; }
+    100% { transform: translateX(4px); opacity: 1; }
+}
+</style>
+
+<div id="interactiveTourOverlay" class="tour-overlay" style="display: none;">
+    <div class="tour-card">
+        <!-- Close/Skip Button -->
+        <button class="tour-close-btn" onclick="closeInteractiveTour()" title="Skip Tour">
+            <i class="bi bi-x-lg"></i>
+        </button>
+
+        <!-- Top Progress Header -->
+        <div class="tour-progress-bar-container">
+            <div id="tourProgressBar" class="tour-progress-bar"></div>
+        </div>
+
+        <div class="tour-content-wrapper">
+            <!-- Left Side: Moving Graphic Illustrations -->
+            <div class="tour-graphic-container">
+                <!-- Step 1 Graphics -->
+                <div class="tour-graphic-step" id="tourGraphic1">
+                    <div class="graphic-circle pulsing-glow">
+                        <i class="bi bi-rocket-takeoff-fill graphic-icon-main floating"></i>
+                    </div>
+                    <div class="graphic-mini-node n1 floating-slow"><i class="bi bi-lightning-fill text-warning"></i></div>
+                    <div class="graphic-mini-node n2 floating-fast"><i class="bi bi-google text-success"></i></div>
+                    <div class="graphic-mini-node n3 floating-mid"><i class="bi bi-gear-wide-connected text-info"></i></div>
+                </div>
+
+                <!-- Step 2 Graphics -->
+                <div class="tour-graphic-step" id="tourGraphic2" style="display:none;">
+                    <div class="mock-connector-panel">
+                        <div class="mock-panel-header">
+                            <i class="bi bi-key-fill text-accent-light"></i> <span>Add Connector</span>
+                        </div>
+                        <div class="mock-panel-body">
+                            <div class="mock-input-group">
+                                <span class="mock-label">App Type</span>
+                                <div class="mock-select"><i class="bi bi-telegram text-info"></i> Telegram Bot</div>
+                            </div>
+                            <div class="mock-input-group">
+                                <span class="mock-label">Bot Token</span>
+                                <div class="mock-input">••••••••••••••••••••••••</div>
+                            </div>
+                            <button class="btn btn-accent btn-sm w-100 mock-save-btn"><i class="bi bi-save"></i> Save Connector</button>
+                        </div>
+                        <!-- Success Webhook Card generated after save -->
+                        <div class="mock-webhook-result" style="display: none;">
+                            <div class="mock-webhook-title text-success"><i class="bi bi-check-circle-fill"></i> Webhook Active</div>
+                            <div class="mock-webhook-url">https://bridge.host/webhook/telegram/...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 Graphics -->
+                <div class="tour-graphic-step" id="tourGraphic3" style="display:none;">
+                    <div class="graphic-nested-structure">
+                        <div class="struct-card level-ws"><i class="bi bi-collection-fill"></i> Workspace</div>
+                        <div class="struct-connector c1"></div>
+                        <div class="struct-card level-proj"><i class="bi bi-folder-fill"></i> Project</div>
+                        <div class="struct-connector c2"></div>
+                        <div class="struct-card level-flow"><i class="bi bi-diagram-3-fill"></i> Workflows</div>
+                    </div>
+                </div>
+
+                <!-- Step 4 Graphics -->
+                <div class="tour-graphic-step" id="tourGraphic4" style="display:none;">
+                    <div class="mock-workflow-canvas">
+                        <div class="mock-node node-trig">
+                            <span class="mock-node-header">Trigger Node</span>
+                            <div class="mock-node-body">
+                                <i class="bi bi-telegram text-info"></i> Webhook
+                            </div>
+                        </div>
+                        <div class="pulsing-arrow"><i class="bi bi-chevron-right"></i></div>
+                        <div class="mock-node node-act">
+                            <span class="mock-node-header">Action Node</span>
+                            <div class="mock-node-body">
+                                <i class="bi bi-google text-success"></i> Apps Script
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 Graphics -->
+                <div class="tour-graphic-step" id="tourGraphic5" style="display:none;">
+                    <div class="mock-toggle-panel">
+                        <div class="mock-header-strip">
+                            <span>Status: <span class="mock-status-text" style="color:var(--text-3)">INACTIVE</span></span>
+                            <div class="mock-toggle-container">
+                                <div class="mock-switch"></div>
+                            </div>
+                        </div>
+                        <div class="mock-test-sidebar">
+                            <div class="mock-test-title">
+                                <span>Test Payload</span>
+                                <span class="badge bg-primary-subtle text-primary" style="font-size:8px;">JSON</span>
+                            </div>
+                            <div class="mock-payload-box">
+                                { "event": "incident.created", "priority": "1" }
+                            </div>
+                            <div class="console-line console-line-res text-success" style="font-size:9.5px; font-weight:bold; display:none;">
+                                <i class="bi bi-check2-circle"></i> Run Successful (200)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Explanation Texts -->
+            <div class="tour-text-container">
+                <div class="tour-step-info" id="tourStepInfo">Step 1 of 5</div>
+
+                <!-- Step 1 Text -->
+                <div class="tour-text-step" id="tourText1">
+                    <h4 class="tour-title">Welcome to Apps Script Bridge</h4>
+                    <p class="tour-desc">
+                        Our platform acts as a secure, high-performance bridge connecting external systems (like <strong>ServiceNow</strong> or <strong>Telegram</strong>) to your <strong>Google Apps Script</strong> functions. Let's take a quick 1-minute tour.
+                    </p>
+                    <div class="tour-tip">
+                        <i class="bi bi-lightbulb-fill"></i> Learn how we process events and route payload arguments to Apps Script.
+                    </div>
+                </div>
+
+                <!-- Step 2 Text -->
+                <div class="tour-text-step" id="tourText2" style="display:none;">
+                    <h4 class="tour-title">1. Add Webhook Connectors</h4>
+                    <p class="tour-desc">
+                        Go to <strong>Credentials → Add Credential</strong> and choose ServiceNow, Telegram, or custom APIs. Input your details and save. This securely generates a unique, private Webhook URL that listens for incoming events from your third-party platform.
+                    </p>
+                    <div class="tour-tip">
+                        <i class="bi bi-key-fill"></i> Re-generate tokens or stop webhook triggers directly from the credentials dashboard.
+                    </div>
+                </div>
+
+                <!-- Step 3 Text -->
+                <div class="tour-text-step" id="tourText3" style="display:none;">
+                    <h4 class="tour-title">2. Organise Environments</h4>
+                    <p class="tour-desc">
+                        Group your connections logically. Create **Workspaces** (e.g. <em>Production</em> vs. <em>Development</em>) and **Projects** (e.g. <em>Ops Webhooks</em>) to isolate your workflows and manage permissions.
+                    </p>
+                </div>
+
+                <!-- Step 4 Text -->
+                <div class="tour-text-step" id="tourText4" style="display:none;">
+                    <h4 class="tour-title">3. Design Visual Workflows</h4>
+                    <p class="tour-desc">
+                        Open your project and click **New Workflow**. Connect a **Trigger Node** (your webhook connector) to an **Action Node** (your Apps Script function). All Apps Script projects and function declarations auto-load directly from your Google Drive!
+                    </p>
+                    <div class="tour-tip">
+                        <i class="bi bi-play-circle-fill"></i> Trigger nodes listen to events while action nodes execute script tasks.
+                    </div>
+                </div>
+
+                <!-- Step 5 Text -->
+                <div class="tour-text-step" id="tourText5" style="display:none;">
+                    <h4 class="tour-title">4. Simulate & Toggle Active</h4>
+                    <p class="tour-desc">
+                        Toggle the **Active/Inactive** switch at the top to control webhook listening. Use the **Test Payload** panel in the canvas to mock incoming data and trigger runs to verify script behavior in real-time.
+                    </p>
+                    <div class="tour-tip">
+                        <i class="bi bi-play-circle-fill"></i> Test individual steps on the canvas to see active schema layouts!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Control Buttons -->
+        <div class="tour-footer">
+            <button class="btn btn-secondary btn-sm" id="tourSkipBtn" onclick="closeInteractiveTour()">Skip Tour</button>
+            <div class="tour-dots">
+                <span class="tour-dot active" onclick="goToTourStep(1)"></span>
+                <span class="tour-dot" onclick="goToTourStep(2)"></span>
+                <span class="tour-dot" onclick="goToTourStep(3)"></span>
+                <span class="tour-dot" onclick="goToTourStep(4)"></span>
+                <span class="tour-dot" onclick="goToTourStep(5)"></span>
+            </div>
+            <div class="tour-nav-btns">
+                <button class="btn btn-secondary btn-sm" id="tourPrevBtn" onclick="prevTourStep()" style="display:none;"><i class="bi bi-chevron-left"></i> Back</button>
+                <button class="btn btn-primary btn-sm" id="tourNextBtn" onclick="nextTourStep()">Next <i class="bi bi-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTourStep = 1;
+const totalTourSteps = 5;
+let tourAnimationTimer = null;
+
+function startInteractiveTour(e) {
+    if (e) e.preventDefault();
+    currentTourStep = 1;
+    goToTourStep(1);
+    const tourOverlay = document.getElementById('interactiveTourOverlay');
+    if (tourOverlay) {
+        tourOverlay.style.display = 'flex';
+        document.body.classList.add('tour-open');
+    }
+}
+
+function closeInteractiveTour() {
+    clearTourAnimations();
+    const tourOverlay = document.getElementById('interactiveTourOverlay');
+    if (tourOverlay) {
+        tourOverlay.style.display = 'none';
+        document.body.classList.remove('tour-open');
+    }
+    localStorage.setItem('asb-guide-seen', 'true');
+}
+
+function clearTourAnimations() {
+    if (tourAnimationTimer) {
+        clearInterval(tourAnimationTimer);
+        tourAnimationTimer = null;
+    }
+}
+
+function runTourStepAnimations(step) {
+    clearTourAnimations();
+    
+    if (step === 2) {
+        const btn = document.querySelector('#tourGraphic2 .mock-save-btn');
+        const result = document.querySelector('#tourGraphic2 .mock-webhook-result');
+        const tokenInput = document.querySelector('#tourGraphic2 .mock-input');
+        if (!btn || !result) return;
+        
+        result.style.display = 'none';
+        tokenInput.textContent = '';
+        btn.innerHTML = '<i class="bi bi-save"></i> Save Connector';
+        btn.className = 'btn btn-accent btn-sm w-100 mock-save-btn';
+        btn.disabled = false;
+        
+        let counter = 0;
+        tourAnimationTimer = setInterval(() => {
+            counter++;
+            if (counter === 1) {
+                tokenInput.textContent = '••••••••••••••••••••••••';
+            } else if (counter === 3) {
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+                btn.disabled = true;
+            } else if (counter === 5) {
+                btn.innerHTML = '<i class="bi bi-check-lg"></i> Saved!';
+                btn.className = 'btn btn-success btn-sm w-100 mock-save-btn';
+                result.style.display = 'block';
+                result.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 9) {
+                counter = 0;
+                result.style.display = 'none';
+                tokenInput.textContent = '';
+                btn.innerHTML = '<i class="bi bi-save"></i> Save Connector';
+                btn.className = 'btn btn-accent btn-sm w-100 mock-save-btn';
+                btn.disabled = false;
+            }
+        }, 500);
+    }
+    
+    else if (step === 3) {
+        const ws = document.querySelector('#tourGraphic3 .level-ws');
+        const proj = document.querySelector('#tourGraphic3 .level-proj');
+        const flow = document.querySelector('#tourGraphic3 .level-flow');
+        const conn1 = document.querySelector('#tourGraphic3 .c1');
+        const conn2 = document.querySelector('#tourGraphic3 .c2');
+        if (!ws || !proj || !flow) return;
+        
+        ws.style.opacity = '0';
+        proj.style.opacity = '0';
+        flow.style.opacity = '0';
+        conn1.style.opacity = '0';
+        conn2.style.opacity = '0';
+        
+        let counter = 0;
+        tourAnimationTimer = setInterval(() => {
+            counter++;
+            if (counter === 1) {
+                ws.style.opacity = '1';
+                ws.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 3) {
+                conn1.style.opacity = '1';
+                proj.style.opacity = '1';
+                proj.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 5) {
+                conn2.style.opacity = '1';
+                flow.style.opacity = '1';
+                flow.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 9) {
+                counter = 0;
+                ws.style.opacity = '0';
+                proj.style.opacity = '0';
+                flow.style.opacity = '0';
+                conn1.style.opacity = '0';
+                conn2.style.opacity = '0';
+            }
+        }, 400);
+    }
+    
+    else if (step === 4) {
+        const trig = document.querySelector('#tourGraphic4 .node-trig');
+        const act = document.querySelector('#tourGraphic4 .node-act');
+        const arrow = document.querySelector('#tourGraphic4 .pulsing-arrow');
+        if (!trig || !act || !arrow) return;
+        
+        trig.style.opacity = '0';
+        act.style.opacity = '0';
+        arrow.style.opacity = '0';
+        
+        let counter = 0;
+        tourAnimationTimer = setInterval(() => {
+            counter++;
+            if (counter === 1) {
+                trig.style.opacity = '1';
+                trig.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 3) {
+                arrow.style.opacity = '1';
+            } else if (counter === 5) {
+                act.style.opacity = '1';
+                act.style.animation = 'fade-in-up 0.3s ease-out';
+            } else if (counter === 9) {
+                counter = 0;
+                trig.style.opacity = '0';
+                act.style.opacity = '0';
+                arrow.style.opacity = '0';
+            }
+        }, 450);
+    }
+    
+    else if (step === 5) {
+        const sw = document.querySelector('#tourGraphic5 .mock-switch');
+        const status = document.querySelector('#tourGraphic5 .mock-status-text');
+        const consoleLog = document.querySelector('#tourGraphic5 .console-line-res');
+        const canvasNode = document.querySelector('#tourGraphic5 .node-act');
+        if (!sw || !status || !consoleLog) return;
+        
+        sw.classList.remove('active');
+        status.textContent = 'INACTIVE';
+        status.style.color = 'var(--text-3)';
+        consoleLog.style.display = 'none';
+        
+        let counter = 0;
+        tourAnimationTimer = setInterval(() => {
+            counter++;
+            if (counter === 1) {
+                sw.classList.add('active');
+                status.textContent = 'ACTIVE';
+                status.style.color = 'var(--success)';
+            } else if (counter === 3) {
+                if (canvasNode) canvasNode.style.boxShadow = '0 0 15px var(--accent-glow)';
+            } else if (counter === 5) {
+                consoleLog.style.display = 'flex';
+                consoleLog.style.animation = 'fade-in-up 0.2s ease-out';
+            } else if (counter === 9) {
+                counter = 0;
+                sw.classList.remove('active');
+                status.textContent = 'INACTIVE';
+                status.style.color = 'var(--text-3)';
+                consoleLog.style.display = 'none';
+                if (canvasNode) canvasNode.style.boxShadow = 'var(--shadow-sm)';
+            }
+        }, 500);
+    }
+}
+
+function goToTourStep(step) {
+    currentTourStep = step;
+    
+    // Hide all text steps and graphics
+    for (let i = 1; i <= totalTourSteps; i++) {
+        const textStep = document.getElementById(`tourText${i}`);
+        const graphicStep = document.getElementById(`tourGraphic${i}`);
+        if (textStep) textStep.style.display = 'none';
+        if (graphicStep) graphicStep.style.display = 'none';
+    }
+
+    // Show active step text and graphic
+    const activeText = document.getElementById(`tourText${step}`);
+    const activeGraphic = document.getElementById(`tourGraphic${step}`);
+    if (activeText) activeText.style.display = 'block';
+    if (activeGraphic) activeGraphic.style.display = 'flex';
+
+    // Update progress bar width
+    const progressBar = document.getElementById('tourProgressBar');
+    if (progressBar) {
+        progressBar.style.width = `${(step / totalTourSteps) * 100}%`;
+    }
+
+    // Update step info text
+    const stepInfo = document.getElementById('tourStepInfo');
+    if (stepInfo) {
+        stepInfo.textContent = `Step ${step} of ${totalTourSteps}`;
+    }
+
+    // Update back and next button states
+    const prevBtn = document.getElementById('tourPrevBtn');
+    const nextBtn = document.getElementById('tourNextBtn');
+    const skipBtn = document.getElementById('tourSkipBtn');
+    
+    if (prevBtn) {
+        prevBtn.style.display = step === 1 ? 'none' : 'inline-block';
+    }
+    
+    if (nextBtn) {
+        if (step === totalTourSteps) {
+            nextBtn.innerHTML = 'Get Started <i class="bi bi-check-lg"></i>';
+            nextBtn.className = 'btn btn-success btn-sm';
+        } else {
+            nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right"></i>';
+            nextBtn.className = 'btn btn-primary btn-sm';
+        }
+    }
+
+    if (skipBtn) {
+        skipBtn.style.display = step === totalTourSteps ? 'none' : 'inline-block';
+    }
+
+    // Update dots
+    const dots = document.querySelectorAll('.tour-dot');
+    dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index + 1 === step);
+    });
+
+    // Run custom step animations
+    runTourStepAnimations(step);
+}
+
+function nextTourStep() {
+    if (currentTourStep < totalTourSteps) {
+        goToTourStep(currentTourStep + 1);
+    } else {
+        closeInteractiveTour();
+    }
+}
+
+function prevTourStep() {
+    if (currentTourStep > 1) {
+        goToTourStep(currentTourStep - 1);
+    }
+}
+
+// Auto-trigger logic
+document.addEventListener('DOMContentLoaded', () => {
+    const googleConnected = {{ 'true' if google_connected else 'false' }};
+    const guideSeen = localStorage.getItem('asb-guide-seen');
+    const isDashboard = window.location.pathname === '/' || window.location.pathname === '';
+    
+    if (googleConnected && guideSeen !== 'true' && isDashboard) {
+        // Automatically start the interactive tour after a short delay
+        setTimeout(() => {
+            startInteractiveTour();
+        }, 800);
+    }
+});
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>

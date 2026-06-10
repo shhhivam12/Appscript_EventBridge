@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ workflow.name if workflow else 'Workflow' }} — AppScript Bridge{% endblock %}
+{% block title %}{{ workflow.name if workflow else 'Workflow' }} — Apps Script Bridge{% endblock %}
 
 {% block breadcrumb %}
 <nav aria-label="breadcrumb" class="breadcrumb">
@@ -1025,7 +1025,7 @@ function updateNodeWebhookInfo() {
         headers += ` -H "X-API-Key: YOUR_API_KEY" -H "X-Event-Type: ${eventType}"`;
     }
     
-    let sampleData = '{"message": "Hello from Astreya AppScript Bridge"}';
+    let sampleData = '{"message": "Hello from Astreya Apps Script Bridge"}';
     if (appType === 'telegram') {
         sampleData = '{"message": {"chat": {"id": 12345}, "text": "/start"}}';
     } else if (appType === 'servicenow') {

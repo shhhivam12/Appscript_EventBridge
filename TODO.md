@@ -1,9 +1,9 @@
-- giving all params to the appscript together, not individual drag and drop
+- giving all params to the Apps Script together, not individual drag and drop
 - auto fetch 
 - dashboard - change quick action to recent workflow, add approval tab 
 
 
-appscript native features MVP of our product (appscript native features)
+Apps Script native features MVP of our product (Apps Script native features)
 - fetching the function, and auto determine the parameters
 - 
 

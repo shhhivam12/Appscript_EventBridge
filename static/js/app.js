@@ -1,5 +1,5 @@
 /* ============================================
-   AppScript Bridge — Core JavaScript
+   Apps Script Bridge — Core JavaScript
    ============================================ */
 
 // ── Theme ──

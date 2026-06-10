@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ project.name if project else 'Project' }} — AppScript Bridge{% endblock %}
+{% block title %}{{ project.name if project else 'Project' }} — Apps Script Bridge{% endblock %}
 {% block breadcrumb %}
 <nav class="breadcrumb">
     <li class="breadcrumb-item"><a href="/workspaces">Workspaces</a></li>
@@ -17,7 +17,7 @@
     </div>
     <div class="d-flex gap-2">
         <button class="btn btn-outline-primary btn-sm" onclick="toggleAIPanel(true)">
-            <i class="bi bi-cpu-fill me-1"></i>Generate with AI
+            <i class="bi bi-cpu-fill me-1"></i>Create with FlowAssist
         </button>
         <a href="/workspaces/{{ workspace.id }}/projects/{{ project.id }}/workflows/new"
            class="btn btn-primary btn-sm">

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}User Guide — AppScript Bridge{% endblock %}
+{% block title %}User Guide — Apps Script Bridge{% endblock %}
 
 {% block breadcrumb %}
 <nav class="breadcrumb">
@@ -107,7 +107,7 @@
                                 <i class="bi bi-lightning-charge-fill"></i>
                             </div>
                             <div>
-                                <div style="font-size:12px;font-weight:600;color:var(--text-1)">AppScript Bridge</div>
+                                <div style="font-size:12px;font-weight:600;color:var(--text-1)">Apps Script Bridge</div>
                                 <div style="font-size:11px;color:var(--text-3)">Receives event, matches to active workflow</div>
                             </div>
                         </div>
@@ -165,7 +165,7 @@
                             <div class="guide-step-num">2</div>
                             <div class="guide-step-body">
                                 <div class="guide-step-title">Add ServiceNow Credential</div>
-                                <p>In AppScript Bridge, go to <a href="/credentials/new/servicenow">Credentials → New ServiceNow</a>. Fill in your instance URL, Client ID, and Client Secret. After saving, copy the <strong>Webhook URL</strong> from the manage page.</p>
+                                <p>In Apps Script Bridge, go to <a href="/credentials/new/servicenow">Credentials → New ServiceNow</a>. Fill in your instance URL, Client ID, and Client Secret. After saving, copy the <strong>Webhook URL</strong> from the manage page.</p>
                             </div>
                         </div>
                         <div class="guide-step">
@@ -173,7 +173,7 @@
                             <div class="guide-step-body">
                                 <div class="guide-step-title">Create a Business Rule in ServiceNow</div>
                                 <p>Navigate to <strong>System Definition → Business Rules</strong>. Create a new rule on your target table (e.g., incident). Under Advanced tab, add this script:</p>
-<pre>// Business Rule: Send to AppScript Bridge
+<pre>// Business Rule: Send to Apps Script Bridge
 (function executeRule(current, previous) {
     var req = new sn_ws.RESTMessageV2();
     req.setEndpoint('YOUR_WEBHOOK_URL_HERE');
@@ -199,7 +199,7 @@
                         <div class="guide-step">
                             <div class="guide-step-num">4</div>
                             <div class="guide-step-body">
-                                <div class="guide-step-title">Create a Workflow in AppScript Bridge</div>
+                                <div class="guide-step-title">Create a Workflow in Apps Script Bridge</div>
                                 <p>Create a workflow using your ServiceNow credential. Set the event type to match what you send in the Business Rule (e.g., <code>incident.created</code>). Select your Apps Script function.</p>
                             </div>
                         </div>
@@ -230,7 +230,7 @@
                             <div><strong>Webhook URL contains the credential ID</strong><p>Keep your webhook URL private — it's the only authentication for ServiceNow events.</p></div>
                         </div>
                         <div class="setup-step"><span class="step-number">!</span>
-                            <div><strong>Deactivate to stop all events</strong><p>If compromised, deactivate the credential in AppScript Bridge — the webhook will immediately return 404.</p></div>
+                            <div><strong>Deactivate to stop all events</strong><p>If compromised, deactivate the credential in Apps Script Bridge — the webhook will immediately return 404.</p></div>
                         </div>
                     </div>
                 </div>
@@ -298,7 +298,7 @@
                             <div class="guide-step-num">4</div>
                             <div class="guide-step-body">
                                 <div class="guide-step-title">Register the Webhook</div>
-                                <p>Open your Telegram credential's manage page and click <strong>Register Webhook with Telegram</strong>. This calls the Telegram API to point your bot at AppScript Bridge's webhook URL.</p>
+                                <p>Open your Telegram credential's manage page and click <strong>Register Webhook with Telegram</strong>. This calls the Telegram API to point your bot at Apps Script Bridge's webhook URL.</p>
                                 <p>Click <strong>Check Status</strong> to verify registration succeeded.</p>
                             </div>
                         </div>
@@ -337,7 +337,7 @@
                             <div><strong>Messages not arriving</strong><p>Check the webhook is registered (Check Status shows the URL). If BASE_URL changed (e.g. new ngrok tunnel), re-register the webhook.</p></div>
                         </div>
                         <div class="setup-step"><span class="step-number">?</span>
-                            <div><strong>command events not firing</strong><p>Make sure your workflow event type is set to <code>command</code>, not <code>message</code> — AppScript Bridge automatically classifies messages starting with / as commands.</p></div>
+                            <div><strong>command events not firing</strong><p>Make sure your workflow event type is set to <code>command</code>, not <code>message</code> — Apps Script Bridge automatically classifies messages starting with / as commands.</p></div>
                         </div>
                     </div>
                 </div>
@@ -356,15 +356,15 @@
                 <div class="card-header-custom">
                     <div class="d-flex align-items-center gap-2">
                         <div class="platform-icon-sm" style="background:rgba(34,197,94,.1);color:#22c55e"><i class="bi bi-google"></i></div>
-                        <h6 style="margin:0">Writing Functions for AppScript Bridge</h6>
+                        <h6 style="margin:0">Writing Functions for Apps Script Bridge</h6>
                     </div>
                 </div>
                 <div class="card-body-custom">
-                    <p style="font-size:12px;color:var(--text-2);margin-bottom:14px">AppScript Bridge calls your function using the Apps Script REST API, passing the full event payload as the first parameter.</p>
+                    <p style="font-size:12px;color:var(--text-2);margin-bottom:14px">Apps Script Bridge calls your function using the Apps Script REST API, passing the full event payload as the first parameter.</p>
 
                     <div class="guide-step-title mb-2">Basic Function Template</div>
 <pre>/**
- * Called by AppScript Bridge when a ServiceNow incident is created.
+ * Called by Apps Script Bridge when a ServiceNow incident is created.
  * @param {Object} payload  The full event payload from ServiceNow.
  */
 function handleIncidentCreated(payload) {
@@ -475,7 +475,7 @@ function handleTelegramMessage(update) {
                     <div id="faqAnswer" style="display:none;margin-bottom:14px"></div>
 
                     <div style="display:flex;flex-wrap:wrap;gap:6px" id="faqSuggestions">
-                        <button class="faq-pill" onclick="faqQ(this.textContent)">What is AppScript Bridge?</button>
+                        <button class="faq-pill" onclick="faqQ(this.textContent)">What is Apps Script Bridge?</button>
                         <button class="faq-pill" onclick="faqQ(this.textContent)">How do I create a workflow?</button>
                         <button class="faq-pill" onclick="faqQ(this.textContent)">How do I connect Telegram?</button>
                         <button class="faq-pill" onclick="faqQ(this.textContent)">How do I set up ServiceNow?</button>
@@ -617,7 +617,7 @@ function filterGuide(q) {
 const FAQ_KB = [
     { keys: ['what','appscript','bridge','app','about','overview','is'],
       topic: 'Overview',
-      answer: 'AppScript Bridge is a webhook automation platform. External apps (ServiceNow, Telegram, etc.) POST events to a unique URL → AppScript Bridge matches the event to an active Workflow → your Google Apps Script function runs with the event JSON as its first argument. No custom server code needed on your side.' },
+      answer: 'Apps Script Bridge is a webhook automation platform. External apps (ServiceNow, Telegram, etc.) POST events to a unique URL → Apps Script Bridge matches the event to an active Workflow → your Google Apps Script function runs with the event JSON as its first argument. No custom server code needed on your side.' },
     { keys: ['create','workflow','new','build','make','how'],
       topic: 'Creating Workflows',
       answer: '① Go to Workspaces → open a project → New Workflow.\n② In the Trigger section, select a credential and event type.\n③ In the Action section, pick an Apps Script project and function (they auto-load from your Google account).\n④ Click "Create Workflow", then toggle it Active in the editor.' },
@@ -626,13 +626,13 @@ const FAQ_KB = [
       answer: '① Message @BotFather on Telegram → /newbot → copy the token.\n② Credentials → New Telegram → paste token, save.\n③ On the manage page click "Register Webhook with Telegram" (requires a public HTTPS URL — use ngrok for local dev).\n④ Create a workflow with your Telegram credential.' },
     { keys: ['servicenow','snow','incident','business','rule'],
       topic: 'ServiceNow Setup',
-      answer: '① In ServiceNow: System OAuth → Application Registry → create OAuth endpoint → copy Client ID + Secret.\n② Credentials → New ServiceNow → fill in instance URL + OAuth details → save → copy webhook URL.\n③ In ServiceNow: create a Business Rule or Flow Designer HTTP step that POSTs to your webhook URL.\n④ Create a workflow in AppScript Bridge with the matching event type.' },
+      answer: '① In ServiceNow: System OAuth → Application Registry → create OAuth endpoint → copy Client ID + Secret.\n② Credentials → New ServiceNow → fill in instance URL + OAuth details → save → copy webhook URL.\n③ In ServiceNow: create a Business Rule or Flow Designer HTTP step that POSTs to your webhook URL.\n④ Create a workflow in Apps Script Bridge with the matching event type.' },
     { keys: ['google','connect','auth','account','gcp'],
       topic: 'Google Connection',
       answer: 'Go to Settings → Connect Google Account. Approve all scopes. Once connected, Apps Script projects and functions auto-load in the workflow builder. Requirement: Apps Script API must be enabled in your GCP project, and the script must be linked to the same GCP project.' },
     { keys: ['webhook','url','endpoint','receive','http','post'],
       topic: 'Webhooks',
-      answer: 'A webhook URL is unique to each credential. Your external app POSTs JSON to it; AppScript Bridge receives it, finds matching active workflows, and calls the configured Apps Script function.\n\n• ServiceNow: /webhook/servicenow/<cred_id>\n• Telegram:   /webhook/telegram/<cred_id>\n• Generic:    /webhook/trigger (needs X-API-Key header)' },
+      answer: 'A webhook URL is unique to each credential. Your external app POSTs JSON to it; Apps Script Bridge receives it, finds matching active workflows, and calls the configured Apps Script function.\n\n• ServiceNow: /webhook/servicenow/<cred_id>\n• Telegram:   /webhook/telegram/<cred_id>\n• Generic:    /webhook/trigger (needs X-API-Key header)' },
     { keys: ['function','receive','data','parameter','payload','argument','pass'],
       topic: 'Apps Script Functions',
       answer: 'Your function receives the full event payload as the first argument:\n\nfunction myHandler(payload) {\n  Logger.log(payload.event_type);\n  Logger.log(payload.number); // INC0001234\n}\n\nThe function must be a top-level declaration in a .gs file, and the script must be linked to the correct GCP project.' },
@@ -678,7 +678,7 @@ function askFaq() {
                 </div>
                 <div style="font-size:12px;color:var(--text-1);white-space:pre-line;line-height:1.65">${escapeHtml(best.answer)}</div>
                 <div style="font-size:10px;color:var(--text-3);margin-top:8px;display:flex;align-items:center;gap:4px">
-                    <i class="bi bi-robot"></i> AppScript Bridge Help
+                    <i class="bi bi-robot"></i> Apps Script Bridge Help
                 </div>
             </div>`;
     } else {

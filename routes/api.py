@@ -309,7 +309,7 @@ def test_webhook_connectivity():
     return jsonify({
         "success": True,
         "echo":    request.json,
-        "message": "AppScript Bridge webhook endpoint is reachable",
+        "message": "Apps Script Bridge webhook endpoint is reachable",
     })
 
 

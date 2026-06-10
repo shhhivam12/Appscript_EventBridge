@@ -105,7 +105,7 @@ def workflow_edit(workflow_id):
         "servicenow": json.dumps({
             "event_type": wf.get("trigger", {}).get("event_type", "incident.created"),
             "number": "INC0010001",
-            "short_description": "Test incident from AppScript Bridge",
+            "short_description": "Test incident from Apps Script Bridge",
             "priority": "3",
             "state": "1",
             "sys_id": "abc123def456"
@@ -116,7 +116,7 @@ def workflow_edit(workflow_id):
                 "from": {"id": 123456, "first_name": "Test", "username": "testuser"},
                 "chat": {"id": 123456, "type": "private"},
                 "date": 1234567890,
-                "text": "/start Hello from AppScript Bridge"
+                "text": "/start Hello from Apps Script Bridge"
             }
         }, indent=2),
         "google_chat": json.dumps({
@@ -153,7 +153,7 @@ def workflow_edit(workflow_id):
             "start": "2026-06-07T17:00:00Z",
             "end": "2026-06-07T18:00:00Z"
         }, indent=2),
-        "custom": json.dumps({"test": True, "message": "Hello from AppScript Bridge"}, indent=2),
+        "custom": json.dumps({"test": True, "message": "Hello from Apps Script Bridge"}, indent=2),
     }
     test_payload = test_payloads.get(source, test_payloads["custom"])
 
